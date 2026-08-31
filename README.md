@@ -105,9 +105,5 @@ DRISHTI-AI/
 | ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, PWA offline logic |
 | Frontend | React PWA, doctor dashboard, health worker UI |
 
----
 
-## Hackathon
 
-**Internal Selection Round** — September 16–17, 2026 (24-hour build)  
-Presidency University, Bengaluru
