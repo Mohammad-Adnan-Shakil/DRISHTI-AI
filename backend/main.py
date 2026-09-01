@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import classify, explain, recommend, patient, screening, referral, quality
 from app.core.config import settings
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="DRISHTI-AI", version="1.0.0")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
