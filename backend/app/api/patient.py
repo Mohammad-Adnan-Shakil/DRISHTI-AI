@@ -51,3 +51,35 @@ async def get_patient(patient_id: int, db: AsyncSession = Depends(get_db)):
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     return patient
+
+
+from app.services.risk_service import calculate_risk as _calc_risk
+from app.models.screening import Screening as _Screening
+
+@router.get("/patient/{patient_id}/risk")
+async def get_patient_risk(patient_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Patient).where(Patient.id == patient_id))
+    patient = result.scalar_one_or_none()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    # Get latest screening grade
+    screening_result = await db.execute(
+        select(_Screening)
+        .where(_Screening.patient_id == patient_id)
+        .order_by(_Screening.created_at.desc())
+    )
+    latest = screening_result.scalars().first()
+    dr_grade = latest.dr_grade if latest else 0
+
+    patient_dict = {
+        "diabetes_duration_years": patient.diabetes_duration_years,
+        "hba1c_level": patient.hba1c_level,
+        "hypertension": patient.hypertension,
+        "family_history_dr": patient.family_history_dr
+    }
+
+    risk = _calc_risk(dr_grade, patient_dict)
+    risk["patient_id"] = patient_id
+    risk["dr_grade"] = dr_grade
+    return risk
