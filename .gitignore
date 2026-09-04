@@ -1,20 +1,20 @@
-﻿# Environment
+﻿# Environment files — NEVER commit these
 .env
 *.env
+.env.*
+!.env.example
 
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *.pyo
-.Python
-*.egg-info/
-dist/
-build/
+**/__pycache__/
+*.pyc
 
-# Static files (generated, not source)
-static/uploads/
-static/temp/
-static/heatmaps/
+# Static generated files
+backend/static/uploads/
+backend/static/temp/
+backend/static/heatmaps/
 
 # Model weights
 ml/models/*.pth
