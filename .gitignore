@@ -1,0 +1,28 @@
+﻿# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+
+# Static files (generated, not source)
+static/uploads/
+static/temp/
+static/heatmaps/
+
+# Model weights
+ml/models/*.pth
+ml/models/*.pt
+
+# VS Code
+.vscode/
+
+# Misc
+*.log
+.DS_Store
