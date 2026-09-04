@@ -1,8 +1,9 @@
-from pydantic_settings import BaseSettings
+﻿from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    GROQ_API_KEY: str
+    GROQ_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
     MODEL_PATH: str = "ml/models/efficientnet_b4_dr.pth"
     HEATMAP_DIR: str = "static/heatmaps"
 
