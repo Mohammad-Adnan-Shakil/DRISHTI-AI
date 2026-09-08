@@ -1,7 +1,7 @@
 # DRISHTI-AI
 ### Explainable AI for Diabetic Retinopathy Screening in Rural India
 **SIH 2026 | Problem Statement: SIH26038 | Organization: MathWorks**
-**Theme: Clean & Green Technology**
+**Theme: MedTech / BioTech / HealthTech**
 
 ---
 
