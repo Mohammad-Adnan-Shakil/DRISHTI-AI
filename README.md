@@ -49,7 +49,7 @@ tool that works offline, explains its decisions, and routes patients to care aut
 - **MATLAB Image Processing Toolbox** — CLAHE preprocessing, quality assessment, vessel segmentation
 - **Simulink + Stateflow** — DR screening pipeline model, referral workflow state machine
 - **Grad-CAM** — explainability heatmaps showing lesion regions
-- **Training Data** — APTOS 2019 (3,662) + IDRiD (516, pixel-level masks) + Messidor-2 (1,748) + EyePACS subset — 5,900+ images total
+- **Training Data** — APTOS 2019 (3,662) + IDRiD (455, pixel-level DME masks) + EyePACS resized (35,108) — 39,225 images total
 
 ### Backend
 - **FastAPI** (Python) — REST API
