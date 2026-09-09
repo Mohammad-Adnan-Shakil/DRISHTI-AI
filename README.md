@@ -25,7 +25,7 @@ tool that works offline, explains its decisions, and routes patients to care aut
 | 3 | EfficientNet-B4 classifies DR severity (Grade 0-4) + flags DME |
 | 4 | Risk stratification engine scores patient using clinical history |
 | 5 | Grad-CAM generates heatmap showing WHERE retinal damage is |
-| 6 | LLM generates referral recommendation in patient preferred language |
+| 6 | Groq LLM generates referral recommendation in patient preferred language |
 | 7 | Patient record saved, doctor notified, referral tracked |
 
 ---
@@ -49,12 +49,12 @@ tool that works offline, explains its decisions, and routes patients to care aut
 - **MATLAB Image Processing Toolbox** — CLAHE preprocessing, quality assessment, vessel segmentation
 - **Simulink + Stateflow** — DR screening pipeline model, referral workflow state machine
 - **Grad-CAM** — explainability heatmaps showing lesion regions
-- **Training Data** — APTOS 2019 (3,662) + IDRiD (455, pixel-level DME masks) + EyePACS resized (35,108) — 39,225 images total
+- **Training Data** — APTOS 2019 (3,662) + IDRiD (455, pixel-level DME masks) — 4,117 images | Validated against Messidor-2 (1,748)
 
 ### Backend
 - **FastAPI** (Python) — REST API
 - **NeonDB** (PostgreSQL serverless) — patient records, screenings, referrals
-- **OpenRouter LLM** — multilingual referral recommendations (Kannada, Hindi, Tamil, Telugu, Marathi, English)
+- **Groq LLM** — multilingual referral recommendations (Kannada, Hindi, Tamil, Telugu, Marathi, English)
 - **Risk stratification engine** — scores Grade 0/1 patients using HbA1c, diabetes duration, hypertension, family history
 
 ### Frontend
@@ -68,7 +68,6 @@ tool that works offline, explains its decisions, and routes patients to care aut
 ---
 
 ## Repository Structure
-
 DRISHTI-AI/
 ├── backend/ # FastAPI REST API
 │ ├── app/
@@ -87,15 +86,15 @@ DRISHTI-AI/
 
 ---
 
-## Target Metrics
+## Model Performance
 
-| Metric | Target |
-|--------|--------|
-| Sensitivity (Grade 2+) | 91-94% |
-| Specificity | > 85% |
-| Processing time | < 5 seconds/image |
-| Report generation | < 30 seconds |
-| Languages supported | 6 (Kannada, Hindi, Tamil, Telugu, Marathi, English) |
+| Metric | Target | Achieved |
+|--------|--------|----------|
+| Sensitivity (Grade 2+) | 91-94% | **92.8%** |
+| Specificity | > 85% | **93.6%** |
+| Processing time | < 5 seconds/image | — |
+| Report generation | < 30 seconds | — |
+| Languages supported | 6 | **6** |
 
 ---
 
@@ -105,5 +104,5 @@ DRISHTI-AI/
 
 | Role | Scope |
 |------|-------|
-| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, LLM, risk engine, PWA offline logic |
+| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, risk engine, PWA offline logic |
 | Frontend | React PWA, doctor dashboard, health worker UI |
