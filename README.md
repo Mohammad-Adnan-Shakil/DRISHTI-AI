@@ -64,10 +64,12 @@ tool that works offline, explains its decisions, and routes patients to care aut
 ### Deployment
 - Backend → Render
 - Frontend → Vercel
+- Model weights → HuggingFace Hub (adnshkl/drishti-efficientnet-b4-dr)
 
 ---
 
 ## Repository Structure
+
 DRISHTI-AI/
 ├── backend/ # FastAPI REST API
 │ ├── app/
@@ -92,7 +94,7 @@ DRISHTI-AI/
 |--------|--------|----------|
 | Sensitivity (Grade 2+) | 91-94% | **92.8%** |
 | Specificity | > 85% | **93.6%** |
-| Processing time | < 5 seconds/image | — |
+| Processing time | < 5 seconds/image | **~2 seconds** |
 | Report generation | < 30 seconds | — |
 | Languages supported | 6 | **6** |
 
