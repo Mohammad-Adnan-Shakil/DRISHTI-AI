@@ -4,7 +4,6 @@ from torchvision import transforms
 from PIL import Image
 from pathlib import Path
 import urllib.request
-from app.core.config import settings
 
 GRADE_LABELS = {
     0: "No DR", 1: "Mild DR", 2: "Moderate DR",
@@ -19,8 +18,9 @@ RISK_MAP = {
     4: {"risk": "Critical", "action": "Urgent referral within 48 hours"}
 }
 
-HF_ONNX_URL = "https://huggingface.co/adnshkl/drishti-efficientnet-b4-dr/resolve/main/efficientnet_b4_dr.onnx"
-ONNX_PATH   = Path("models/efficientnet_b4_dr.onnx")
+HF_BASE = "https://huggingface.co/adnshkl/drishti-efficientnet-b4-dr/resolve/main"
+ONNX_PATH = Path("/tmp/efficientnet_b4_dr.onnx")
+ONNX_DATA_PATH = Path("/tmp/efficientnet_b4_dr.onnx.data")
 
 class DRClassifier:
     def __init__(self):
@@ -37,10 +37,14 @@ class DRClassifier:
             return self._session
 
         if not ONNX_PATH.exists():
-            print("[MODEL] Downloading ONNX model from HuggingFace...")
-            ONNX_PATH.parent.mkdir(parents=True, exist_ok=True)
-            urllib.request.urlretrieve(HF_ONNX_URL, ONNX_PATH)
-            print("[MODEL] Download complete.")
+            print("[MODEL] Downloading ONNX model...")
+            urllib.request.urlretrieve(f"{HF_BASE}/efficientnet_b4_dr.onnx", ONNX_PATH)
+            print("[MODEL] ONNX file downloaded.")
+
+        if not ONNX_DATA_PATH.exists():
+            print("[MODEL] Downloading ONNX data file...")
+            urllib.request.urlretrieve(f"{HF_BASE}/efficientnet_b4_dr.onnx.data", ONNX_DATA_PATH)
+            print("[MODEL] ONNX data file downloaded.")
 
         self._session = ort.InferenceSession(
             str(ONNX_PATH),
