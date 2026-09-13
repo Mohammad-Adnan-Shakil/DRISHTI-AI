@@ -1,0 +1,16 @@
+﻿services:
+  - type: web
+    name: drishti-ai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: MODEL_PATH
+        value: ml/models/efficientnet_b4_dr.pth

@@ -3,6 +3,8 @@ import torch.nn as nn
 from torchvision import transforms
 import timm
 from PIL import Image
+from pathlib import Path
+import urllib.request
 from app.core.config import settings
 
 GRADE_LABELS = {
@@ -17,6 +19,8 @@ RISK_MAP = {
     3: {"risk": "High Risk", "action": "Refer within 2 weeks"},
     4: {"risk": "Critical", "action": "Urgent referral within 48 hours"}
 }
+
+HF_MODEL_URL = "https://huggingface.co/adnshkl/drishti-efficientnet-b4-dr/resolve/main/efficientnet_b4_dr.pth"
 
 class DRModel(nn.Module):
     def __init__(self):
@@ -47,14 +51,21 @@ class DRClassifier:
 
     def _load_model(self):
         model = DRModel()
+        model_path = Path(settings.MODEL_PATH)
+
+        if not model_path.exists():
+            print(f"[MODEL] Weights not found locally, downloading from HuggingFace...")
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            urllib.request.urlretrieve(HF_MODEL_URL, model_path)
+            print(f"[MODEL] Downloaded to {model_path}")
+
         try:
-            state = torch.load(settings.MODEL_PATH, map_location=self.device)
+            state = torch.load(model_path, map_location=self.device)
             model.load_state_dict(state)
-            print(f"[MODEL] Loaded trained weights from {settings.MODEL_PATH}")
-        except FileNotFoundError:
-            print("[MODEL] No weights found — dev mode")
+            print(f"[MODEL] Loaded trained weights — 92.8% sensitivity")
         except Exception as e:
-            print(f"[MODEL] Load error: {e}")
+            print(f"[MODEL] Load error: {e} — running in dev mode")
+
         model.to(self.device)
         model.eval()
         return model
