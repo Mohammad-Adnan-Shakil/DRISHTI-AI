@@ -14,3 +14,5 @@
         sync: false
       - key: MODEL_PATH
         value: ml/models/efficientnet_b4_dr.pth
+      - key: PYTHON_VERSION
+        value: 3.11.9
