@@ -1,7 +1,6 @@
-﻿import torch
-import torch.nn as nn
+﻿import numpy as np
+import onnxruntime as ort
 from torchvision import transforms
-import timm
 from PIL import Image
 from pathlib import Path
 import urllib.request
@@ -20,28 +19,12 @@ RISK_MAP = {
     4: {"risk": "Critical", "action": "Urgent referral within 48 hours"}
 }
 
-HF_MODEL_URL = "https://huggingface.co/adnshkl/drishti-efficientnet-b4-dr/resolve/main/efficientnet_b4_dr.pth"
-
-class DRModel(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.backbone = timm.create_model("efficientnet_b4", pretrained=False, num_classes=0)
-        feat_dim = self.backbone.num_features
-        self.dr_head = nn.Sequential(
-            nn.Dropout(0.4),
-            nn.Linear(feat_dim, 512),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(512, 5)
-        )
-
-    def forward(self, x):
-        return self.dr_head(self.backbone(x))
+HF_ONNX_URL = "https://huggingface.co/adnshkl/drishti-efficientnet-b4-dr/resolve/main/efficientnet_b4_dr.onnx"
+ONNX_PATH   = Path("models/efficientnet_b4_dr.onnx")
 
 class DRClassifier:
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model  = self._load_model()
+        self._session = None
         self.transform = transforms.Compose([
             transforms.Resize((380, 380)),
             transforms.ToTensor(),
@@ -49,42 +32,37 @@ class DRClassifier:
                                  [0.229, 0.224, 0.225])
         ])
 
-    def _load_model(self):
-        model = DRModel()
-        model_path = Path(settings.MODEL_PATH)
+    def _get_session(self):
+        if self._session is not None:
+            return self._session
 
-        if not model_path.exists():
-            print(f"[MODEL] Weights not found locally, downloading from HuggingFace...")
-            model_path.parent.mkdir(parents=True, exist_ok=True)
-            urllib.request.urlretrieve(HF_MODEL_URL, model_path)
-            print(f"[MODEL] Downloaded to {model_path}")
+        if not ONNX_PATH.exists():
+            print("[MODEL] Downloading ONNX model from HuggingFace...")
+            ONNX_PATH.parent.mkdir(parents=True, exist_ok=True)
+            urllib.request.urlretrieve(HF_ONNX_URL, ONNX_PATH)
+            print("[MODEL] Download complete.")
 
-        try:
-            state = torch.load(model_path, map_location=self.device)
-            model.load_state_dict(state)
-            print(f"[MODEL] Loaded trained weights — 92.8% sensitivity")
-        except Exception as e:
-            print(f"[MODEL] Load error: {e} — running in dev mode")
-
-        model.to(self.device)
-        model.eval()
-        return model
+        self._session = ort.InferenceSession(
+            str(ONNX_PATH),
+            providers=["CPUExecutionProvider"]
+        )
+        print("[MODEL] ONNX session loaded — 92.8% sensitivity")
+        return self._session
 
     def predict(self, image: Image.Image):
-        tensor = self.transform(image).unsqueeze(0).to(self.device)
-        with torch.no_grad():
-            logits = self.model(tensor)
-            probs  = torch.softmax(logits, dim=1)
-            confidence, grade = torch.max(probs, dim=1)
-        grade      = grade.item()
-        confidence = round(confidence.item() * 100, 2)
+        session = self._get_session()
+        tensor  = self.transform(image).unsqueeze(0).numpy()
+        logits  = session.run(None, {"input": tensor})[0][0]
+        probs   = np.exp(logits) / np.sum(np.exp(logits))
+        grade   = int(np.argmax(probs))
+        confidence = round(float(probs[grade]) * 100, 2)
         return {
             "grade":      grade,
             "label":      GRADE_LABELS[grade],
             "confidence": confidence,
             "risk":       RISK_MAP[grade]["risk"],
             "action":     RISK_MAP[grade]["action"],
-            "all_probs":  probs.squeeze().tolist()
+            "all_probs":  probs.tolist()
         }
 
 classifier = DRClassifier()

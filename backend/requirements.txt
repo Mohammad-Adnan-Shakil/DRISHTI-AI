@@ -1,6 +1,7 @@
 ﻿fastapi==0.111.0
 uvicorn==0.29.0
 python-multipart==0.0.9
+onnxruntime==1.19.2
 torch==2.13.0+cpu
 torchvision==0.28.0+cpu
 --extra-index-url https://download.pytorch.org/whl/cpu
