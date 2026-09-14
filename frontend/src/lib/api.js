@@ -8,7 +8,7 @@ const RENDER_URL = 'https://drishti-ai-69kp.onrender.com'
 // ⚠️ UPDATE THIS to your laptop's local IP before demo
 // Run `ipconfig` → find IPv4 Address under your WiFi adapter
 // Example: 'http://192.168.1.5:8000'
-const LOCAL_URL = 'http://192.168.1.2:8000'
+const LOCAL_URL = 'https://drishti-ai-69kp.onrender.com'
 
 // ─────────────────────────────────────────────
 // HELPERS
