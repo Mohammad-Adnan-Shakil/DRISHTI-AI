@@ -1,102 +1,78 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Eye,
-  Calendar,
-  AlertTriangle,
-  CheckCircle2,
-  Users,
-  Clock,
-  ArrowRight,
-  ShieldCheck
-} from 'lucide-react'
+import { Eye, Calendar, AlertTriangle, CheckCircle2, Users, Clock, ArrowRight, ShieldCheck } from 'lucide-react'
 import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
+import { getPendingScreenings, getScreeningStats } from '../lib/api'
+
+const MOCK_QUEUE = [
+  { id: 'DRI-2026-00419', name: 'Ravi T.', phc: 'PHC Chelur', drGrade: 4, confidence: '91%', time: '7:55 AM', urgency: 'Critical', railColor: 'border-l-[#991B1B]' },
+  { id: 'DRI-2026-00411', name: 'Mahesh K.', phc: 'PHC Hosakote', drGrade: 3, confidence: '93%', time: '8:42 AM', urgency: 'Urgent', railColor: 'border-l-[#DC2626]' },
+  { id: 'DRI-2026-00408', name: 'Farooq A.', phc: 'PHC Hosakote', drGrade: 3, confidence: '92%', time: '11:05 AM', urgency: 'Urgent', railColor: 'border-l-[#DC2626]' },
+  { id: 'DRI-2026-00421', name: 'Anitha R.', phc: 'PHC Hosakote', drGrade: 2, confidence: '94%', time: '10:32 AM', urgency: 'High', railColor: 'border-l-[#EA580C]' },
+  { id: 'DRI-2026-00412', name: 'Lakshmi D.', phc: 'PHC Chelur', drGrade: 2, confidence: '89%', time: '9:20 AM', urgency: 'High', railColor: 'border-l-[#EA580C]' },
+  { id: 'DRI-2026-00415', name: 'Savithri M.', phc: 'PHC Hosakote', drGrade: 1, confidence: '91%', time: '9:15 AM', urgency: 'Routine', railColor: 'border-l-[#94A3B8]' },
+]
+
+function getRailColor(grade) {
+  if (grade >= 4) return 'border-l-[#991B1B]'
+  if (grade === 3) return 'border-l-[#DC2626]'
+  if (grade === 2) return 'border-l-[#EA580C]'
+  return 'border-l-[#94A3B8]'
+}
+
+function getUrgency(grade) {
+  if (grade >= 4) return 'Critical'
+  if (grade === 3) return 'Urgent'
+  if (grade === 2) return 'High'
+  return 'Routine'
+}
 
 export default function DoctorDashboard() {
   const navigate = useNavigate()
   const [filterSeverity, setFilterSeverity] = useState('all')
+  const [queueData, setQueueData] = useState(MOCK_QUEUE)
+  const [stats, setStats] = useState({ pending: 14, reviewed: 32, confirmed: 26 })
+  const [loading, setLoading] = useState(true)
 
-  const queueData = [
-    {
-      id: 'DRI-2026-00419',
-      name: 'Ravi T.',
-      phc: 'PHC Chelur',
-      drGrade: 4,
-      gradeLabel: 'Grade 4 · Proliferative DR',
-      confidence: '91%',
-      time: '7:55 AM',
-      urgency: 'Critical',
-      urgencyColor: 'bg-red-900 text-white',
-      badgeColor: 'bg-[#7F1D1D] text-white border-red-900',
-      railColor: 'border-l-[#991B1B]'
-    },
-    {
-      id: 'DRI-2026-00411',
-      name: 'Mahesh K.',
-      phc: 'PHC Hosakote',
-      drGrade: 3,
-      gradeLabel: 'Grade 3 · Severe DR',
-      confidence: '93%',
-      time: '8:42 AM',
-      urgency: 'Urgent',
-      urgencyColor: 'bg-rose-100 text-rose-800 border-rose-200',
-      badgeColor: 'bg-rose-50 text-rose-800 border-rose-200',
-      railColor: 'border-l-[#DC2626]'
-    },
-    {
-      id: 'DRI-2026-00408',
-      name: 'Farooq A.',
-      phc: 'PHC Hosakote',
-      drGrade: 3,
-      gradeLabel: 'Grade 3 · Severe DR',
-      confidence: '92%',
-      time: '11:05 AM',
-      urgency: 'Urgent',
-      urgencyColor: 'bg-rose-100 text-rose-800 border-rose-200',
-      badgeColor: 'bg-rose-50 text-rose-800 border-rose-200',
-      railColor: 'border-l-[#DC2626]'
-    },
-    {
-      id: 'DRI-2026-00421',
-      name: 'Anitha R.',
-      phc: 'PHC Hosakote',
-      drGrade: 2,
-      gradeLabel: 'Grade 2 · Moderate DR',
-      confidence: '94%',
-      time: '10:32 AM',
-      urgency: 'High',
-      urgencyColor: 'bg-orange-100 text-orange-800 border-orange-200',
-      badgeColor: 'bg-orange-50 text-orange-800 border-orange-200',
-      railColor: 'border-l-[#EA580C]'
-    },
-    {
-      id: 'DRI-2026-00412',
-      name: 'Lakshmi D.',
-      phc: 'PHC Chelur',
-      drGrade: 2,
-      gradeLabel: 'Grade 2 · Moderate DR',
-      confidence: '89%',
-      time: '9:20 AM',
-      urgency: 'High',
-      urgencyColor: 'bg-orange-100 text-orange-800 border-orange-200',
-      badgeColor: 'bg-orange-50 text-orange-800 border-orange-200',
-      railColor: 'border-l-[#EA580C]'
-    },
-    {
-      id: 'DRI-2026-00415',
-      name: 'Savithri M.',
-      phc: 'PHC Hosakote',
-      drGrade: 1,
-      gradeLabel: 'Grade 1 · Mild DR',
-      confidence: '91%',
-      time: '9:15 AM',
-      urgency: 'Routine',
-      urgencyColor: 'bg-slate-100 text-slate-700 border-slate-200',
-      badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
-      railColor: 'border-l-[#94A3B8]'
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [pendingRes, statsRes] = await Promise.allSettled([
+          getPendingScreenings(),
+          getScreeningStats()
+        ])
+
+        if (pendingRes.status === 'fulfilled' && pendingRes.value?.length > 0) {
+          const mapped = pendingRes.value.map(s => ({
+            id: s.patient_id || s.id || 'DRI-2026-00000',
+            name: s.patient_name || s.name || 'Patient',
+            phc: s.phc_id || 'PHC Hosakote',
+            drGrade: s.dr_grade ?? 0,
+            confidence: `${s.dr_confidence ?? 90}%`,
+            time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+            urgency: getUrgency(s.dr_grade ?? 0),
+            railColor: getRailColor(s.dr_grade ?? 0)
+          }))
+          setQueueData(mapped)
+        }
+
+        if (statsRes.status === 'fulfilled' && statsRes.value) {
+          const s = statsRes.value
+          setStats({
+            pending: s.pending_reviews ?? s.total_screenings ?? 14,
+            reviewed: s.reviewed_today ?? 32,
+            confirmed: s.referrals_confirmed ?? 26,
+          })
+        }
+      } catch (err) {
+        console.error('DoctorDashboard fetch failed:', err)
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+    fetchData()
+  }, [])
 
   const filteredQueue = queueData.filter(item => {
     if (filterSeverity === 'critical') return item.drGrade === 4
@@ -107,34 +83,28 @@ export default function DoctorDashboard() {
   })
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] antialiased selection:bg-[#E6F4EA] selection:text-[#047857] pb-12">
+    <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] antialiased pb-12">
       <DoctorNavbar />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7 sm:py-8 space-y-7 sm:space-y-8">
-        {/* WELCOME HERO CARD */}
+
+        {/* WELCOME HERO */}
         <section className="bg-gradient-to-br from-[#E6F4EA] via-white to-[#CCFBF1]/40 rounded-2xl border border-[#E2E7E3] shadow-[0_2px_12px_rgba(40,89,67,0.04)] p-6 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
           <Eye className="absolute -right-4 -bottom-8 w-48 h-48 text-[#16866A] opacity-[0.03] rotate-[-10deg] pointer-events-none" aria-hidden="true" />
-          <div aria-hidden="true" className="pointer-events-none absolute -top-12 -left-12 w-48 h-48 rounded-full blur-2xl opacity-30" style={{ background: 'radial-gradient(circle, #285943 0%, rgba(40, 89, 67, 0) 70%)' }} />
           <div className="relative z-10 space-y-1">
             <h1 className="font-heading text-2xl sm:text-3xl font-extrabold tracking-tight text-[#20312A]" style={{ fontSize: 'clamp(26px, 2.5vw, 32px)', letterSpacing: '-0.02em' }}>
               <span className="text-[#20312A]">Welcome back, </span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#285943] to-[#16866A] font-extrabold">Dr. Arjun Sharma</span>
             </h1>
             <div className="h-1 w-24 bg-gradient-to-r from-[#16866A] to-transparent rounded-full mt-3" />
-            <p className="text-sm font-medium text-[#66756D] max-w-2xl mt-1">
-              Review Queue • Confirm AI-assisted screenings and guide referral decisions across primary health centres.
-            </p>
+            <p className="text-sm font-medium text-[#66756D] max-w-2xl mt-1">Review Queue • Confirm AI-assisted screenings and guide referral decisions across primary health centres.</p>
           </div>
-
-          {/* Right Meta Context */}
           <div className="relative z-10 flex flex-wrap items-center gap-2.5 self-start md:self-center">
-            {/* Live Date */}
             <div className="inline-flex items-center gap-2 text-xs font-medium text-[#20312A] bg-white border border-[#E2E7E3] shadow-[0_2px_8px_rgba(40,89,67,0.06)] rounded-lg px-3 py-1.5">
               <Calendar className="w-4 h-4 text-[#16866A]" />
-              <span>Saturday, 5 Sept 2026</span>
+              <span>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</span>
             </div>
-            {/* Status Pill */}
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200 shadow-clinical-sm">
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
               <span className="relative flex h-2.5 w-2.5 mr-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#059669]" />
@@ -144,96 +114,59 @@ export default function DoctorDashboard() {
           </div>
         </section>
 
-        {/* STAT CARDS (4-GRID) */}
+        {/* STAT CARDS */}
         <section aria-label="Clinical Queue Statistics">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-            {/* Card 1: Pending Reviews */}
-            <div className="stat-card bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#DC2626] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
+            <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#DC2626] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs sm:text-[13px] font-medium text-[#66756D]">Pending Reviews</span>
-                <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-[#DC2626]">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
+                <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-[#DC2626]"><AlertTriangle className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#DC2626] tracking-tight">
-                  14
-                </div>
-                <div className="flex items-center gap-1 text-[11px] text-rose-600 font-semibold mt-1">
-                  <span>● 3 urgent (Grade 3/4)</span>
-                </div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#DC2626] tracking-tight">{loading ? '...' : stats.pending}</div>
+                <div className="flex items-center gap-1 text-[11px] text-rose-600 font-semibold mt-1"><span>● 3 urgent (Grade 3/4)</span></div>
               </div>
             </div>
-
-            {/* Card 2: Reviewed Today */}
-            <div className="stat-card bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#16866A] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
+            <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#16866A] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs sm:text-[13px] font-medium text-[#66756D]">Reviewed Today</span>
-                <div className="w-8 h-8 rounded-lg bg-[#E6F4EA] border border-[#16866A]/20 flex items-center justify-center text-[#16866A]">
-                  <CheckCircle2 className="w-4 h-4" />
-                </div>
+                <div className="w-8 h-8 rounded-lg bg-[#E6F4EA] border border-[#16866A]/20 flex items-center justify-center text-[#16866A]"><CheckCircle2 className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#16866A] tracking-tight">
-                  32
-                </div>
-                <div className="flex items-center gap-1 text-[11px] text-[#047857] font-semibold mt-1">
-                  <span>↑ 8 cases from yesterday</span>
-                </div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#16866A] tracking-tight">{loading ? '...' : stats.reviewed}</div>
+                <div className="flex items-center gap-1 text-[11px] text-[#047857] font-semibold mt-1"><span>↑ 8 cases from yesterday</span></div>
               </div>
             </div>
-
-            {/* Card 3: Referrals Confirmed */}
-            <div className="stat-card bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#285943] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
+            <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#285943] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs sm:text-[13px] font-medium text-[#66756D]">Referrals Confirmed</span>
-                <div className="w-8 h-8 rounded-lg bg-[#E6F4EA] border border-[#285943]/20 flex items-center justify-center text-[#285943]">
-                  <Users className="w-4 h-4" />
-                </div>
+                <div className="w-8 h-8 rounded-lg bg-[#E6F4EA] border border-[#285943]/20 flex items-center justify-center text-[#285943]"><Users className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#285943] tracking-tight">
-                  26
-                </div>
-                <div className="flex items-center gap-1 text-[11px] text-[#285943] font-semibold mt-1">
-                  <span>81.2% confirmation rate</span>
-                </div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#285943] tracking-tight">{loading ? '...' : stats.confirmed}</div>
+                <div className="flex items-center gap-1 text-[11px] text-[#285943] font-semibold mt-1"><span>81.2% confirmation rate</span></div>
               </div>
             </div>
-
-            {/* Card 4: Avg Review Time */}
-            <div className="stat-card bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#64748B] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
+            <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#64748B] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs sm:text-[13px] font-medium text-[#66756D]">Avg Review Time</span>
-                <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[#64748B]">
-                  <Clock className="w-4 h-4" />
-                </div>
+                <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[#64748B]"><Clock className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#64748B] tracking-tight">
-                  4m 32s
-                </div>
-                <div className="flex items-center gap-1 text-[11px] text-[#66756D] font-medium mt-1">
-                  <span>Within clinical SLA (&lt; 8m)</span>
-                </div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#64748B] tracking-tight">4m 32s</div>
+                <div className="flex items-center gap-1 text-[11px] text-[#66756D] font-medium mt-1"><span>Within clinical SLA (&lt; 8m)</span></div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* CLINICAL QUEUE SECTION */}
+        {/* CLINICAL QUEUE */}
         <section className="bg-white rounded-xl border border-[#E2E7E3] shadow-[0_2px_12px_rgba(40,89,67,0.04)] overflow-hidden">
-          {/* Section Header & Clinical Disclaimer */}
           <div className="px-5 py-4 border-b border-[#E2E7E3] bg-[#F8FAF7] flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-base font-semibold text-[#20312A] font-heading">
-                  Needs Clinical Review
-                </h2>
-                <span className="text-xs text-slate-400 hidden sm:inline">•</span>
-                <span className="text-xs text-[#66756D]">
-                  Sorted by urgency · AI screening supports review, not final diagnosis
-                </span>
+                <h2 className="text-base font-semibold text-[#20312A] font-heading">Needs Clinical Review</h2>
+                <span className="text-xs text-[#66756D]">Sorted by urgency · AI screening supports review, not final diagnosis</span>
               </div>
               <p className="text-xs text-[#66756D] mt-1 flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#16866A] flex-shrink-0" />
@@ -241,7 +174,6 @@ export default function DoctorDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2 self-start md:self-center">
-              {/* Filter Tabs */}
               <div className="inline-flex rounded-full p-1 bg-[#F8FAF7] border border-[#E2E7E3] text-xs gap-1">
                 {[
                   { id: 'all', label: `All (${queueData.length})` },
@@ -249,16 +181,12 @@ export default function DoctorDashboard() {
                   { id: 'urgent', label: 'Grade 3 (2)' },
                   { id: 'moderate', label: 'Grade 2 (2)' }
                 ].map(tab => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setFilterSeverity(tab.id)}
+                  <button key={tab.id} type="button" onClick={() => setFilterSeverity(tab.id)}
                     className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${
                       filterSeverity === tab.id
                         ? 'bg-gradient-to-r from-[#D9F99D] via-[#DCFCE7] to-[#CCFBF1] text-[#14532D] font-bold border border-[#A7F3D0] shadow-2xs'
                         : 'text-[#66756D] hover:text-[#20312A] hover:bg-white/80 font-medium'
-                    }`}
-                  >
+                    }`}>
                     {tab.label}
                   </button>
                 ))}
@@ -266,7 +194,7 @@ export default function DoctorDashboard() {
             </div>
           </div>
 
-          {/* DESKTOP TABLE VIEW */}
+          {/* Desktop Table */}
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -282,53 +210,32 @@ export default function DoctorDashboard() {
               </thead>
               <tbody className="divide-y divide-[#E2E7E3] text-sm bg-white">
                 {filteredQueue.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={`hover:bg-[#F8FAF7]/80 transition-colors border-l-[4px] ${item.railColor}`}
-                  >
+                  <tr key={item.id} className={`hover:bg-[#F8FAF7]/80 transition-colors border-l-[4px] ${item.railColor}`}>
                     <td className="py-3.5 pl-4 pr-3">
                       <div className="font-bold text-[#20312A]">{item.name}</div>
                       <div className="text-xs text-[#66756D] font-mono">{item.id}</div>
                     </td>
                     <td className="py-3.5 px-3 text-xs text-[#20312A] font-medium">{item.phc}</td>
-                    <td className="py-3.5 px-3">
-                      <GradeBadge grade={item.drGrade} />
-                    </td>
+                    <td className="py-3.5 px-3"><GradeBadge grade={item.drGrade} /></td>
                     <td className="py-3.5 px-3">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-semibold text-[#20312A] min-w-[32px]">
-                          {item.confidence}
-                        </span>
+                        <span className="font-mono text-xs font-semibold text-[#20312A] min-w-[32px]">{item.confidence}</span>
                         <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden shrink-0">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              parseInt(item.confidence, 10) > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]'
-                            }`}
-                            style={{ width: item.confidence }}
-                          />
+                          <div className={`h-full rounded-full ${parseInt(item.confidence) > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]'}`} style={{ width: item.confidence }} />
                         </div>
                       </div>
                     </td>
                     <td className="py-3.5 px-3 text-xs text-[#20312A] font-medium">{item.time}</td>
                     <td className="py-3.5 px-3">
                       {item.urgency === 'Critical' || item.urgency === 'Urgent' ? (
-                        <span className="text-[#DC2626] font-bold text-xs uppercase flex items-center gap-1">
-                          <AlertTriangle size={14} className="shrink-0" />
-                          <span>{item.urgency}</span>
-                        </span>
+                        <span className="text-[#DC2626] font-bold text-xs uppercase flex items-center gap-1"><AlertTriangle size={14} className="shrink-0" /><span>{item.urgency}</span></span>
                       ) : (
-                        <span className="text-[#475569] font-bold text-xs uppercase flex items-center gap-1">
-                          <Clock size={14} className="shrink-0" />
-                          <span>{item.urgency}</span>
-                        </span>
+                        <span className="text-[#475569] font-bold text-xs uppercase flex items-center gap-1"><Clock size={14} className="shrink-0" /><span>{item.urgency}</span></span>
                       )}
                     </td>
                     <td className="py-3.5 pl-3 pr-5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/doctor-review/${item.id}`)}
-                        className="bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 cursor-pointer text-xs"
-                      >
+                      <button type="button" onClick={() => navigate(`/doctor-review/${item.id}`)}
+                        className="bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 cursor-pointer text-xs">
                         <span>Review</span>
                         <ArrowRight className="w-3.5 h-3.5 text-current" />
                       </button>
@@ -339,13 +246,10 @@ export default function DoctorDashboard() {
             </table>
           </div>
 
-          {/* MOBILE CARD VIEW */}
+          {/* Mobile Cards */}
           <div className="block sm:hidden p-4 space-y-3 bg-[#F8FAF7]">
             {filteredQueue.map((item) => (
-              <div
-                key={item.id}
-                className={`bg-white rounded-lg p-4 border border-[#E2E7E3] shadow-[0_2px_12px_rgba(40,89,67,0.04)] border-l-[4px] ${item.railColor} space-y-3`}
-              >
+              <div key={item.id} className={`bg-white rounded-lg p-4 border border-[#E2E7E3] shadow-[0_2px_12px_rgba(40,89,67,0.04)] border-l-[4px] ${item.railColor} space-y-3`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="font-bold text-[#20312A] text-base">{item.name}</div>
@@ -355,37 +259,16 @@ export default function DoctorDashboard() {
                 </div>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <GradeBadge grade={item.drGrade} />
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-semibold text-[#20312A]">
-                      {item.confidence}
-                    </span>
-                    <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden shrink-0">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          parseInt(item.confidence, 10) > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]'
-                        }`}
-                        style={{ width: item.confidence }}
-                      />
-                    </div>
-                  </div>
+                  <span className="font-mono text-xs font-semibold text-[#20312A]">{item.confidence}</span>
                 </div>
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
                   {item.urgency === 'Critical' || item.urgency === 'Urgent' ? (
-                    <span className="text-[#DC2626] font-bold text-xs uppercase flex items-center gap-1">
-                      <AlertTriangle size={14} className="shrink-0" />
-                      <span>{item.urgency}</span>
-                    </span>
+                    <span className="text-[#DC2626] font-bold text-xs uppercase flex items-center gap-1"><AlertTriangle size={14} /><span>{item.urgency}</span></span>
                   ) : (
-                    <span className="text-[#475569] font-bold text-xs uppercase flex items-center gap-1">
-                      <Clock size={14} className="shrink-0" />
-                      <span>{item.urgency}</span>
-                    </span>
+                    <span className="text-[#475569] font-bold text-xs uppercase flex items-center gap-1"><Clock size={14} /><span>{item.urgency}</span></span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/doctor-review/${item.id}`)}
-                    className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold rounded-lg border border-[#E2E7E3] transition-colors text-xs cursor-pointer"
-                  >
+                  <button type="button" onClick={() => navigate(`/doctor-review/${item.id}`)}
+                    className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold rounded-lg border border-[#E2E7E3] transition-colors text-xs cursor-pointer">
                     <span>Review Case</span>
                     <ArrowRight className="w-3.5 h-3.5 text-current" />
                   </button>
