@@ -105,6 +105,34 @@ async def get_pending_screenings(db: AsyncSession = Depends(get_db)):
         for s, p in rows
     ]
 
+@router.get("/screenings/reviewed")
+async def get_reviewed_screenings(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Screening, Patient)
+        .join(Patient, Screening.patient_id == Patient.id)
+        .where(Screening.reviewed == True)
+        .order_by(Screening.created_at.desc())
+    )
+    rows = result.all()
+    return [
+        {
+            "screening_id": s.id,
+            "patient_id": p.id,
+            "patient_name": p.name,
+            "patient_age": p.age,
+            "phc_id": p.phc_id,
+            "dr_grade": s.dr_grade,
+            "dr_confidence": s.dr_confidence,
+            "dme_present": s.dme_present,
+            "risk_stratification": s.risk_stratification,
+            "heatmap_url": s.heatmap_url,
+            "recommendation_text": s.recommendation_text,
+            "referral_recommended": s.referral_recommended,
+            "created_at": s.created_at.isoformat() if s.created_at else None
+        }
+        for s, p in rows
+    ]
+
 @router.get("/screenings/stats")
 async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     total = await db.execute(select(func.count(Screening.id)))

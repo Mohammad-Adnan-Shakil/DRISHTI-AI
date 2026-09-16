@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -20,12 +20,15 @@ import {
   Activity,
   Layers,
   Award,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import GradeBadge from '../components/GradeBadge'
+import PatientHistoryPDF from '../components/PatientHistoryPDF'
 import { getPatient } from '../lib/api'
 import { cn, RISK_TIER_STYLES } from '../lib/utils'
+import { exportNodeToPdf, sanitizeFilenameSegment } from '../lib/pdfExport'
 
 export default function PatientHistory() {
   const navigate = useNavigate()
@@ -58,6 +61,61 @@ export default function PatientHistory() {
   })
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const pdfRef = useRef(null)
+
+  // Display name — real for API-backed patients, the page's demo name
+  // otherwise (this page's visit timeline below is demo content either way).
+  const patientDisplayName = apiPatient?.name || 'Anitha R.'
+
+  const patientForPdf = {
+    id: activePatientId,
+    name: patientDisplayName,
+    ageGender: apiPatient?.age != null && apiPatient?.gender
+      ? `${apiPatient.age} yrs • ${apiPatient.gender}`
+      : '52 yrs • Female',
+    phc: apiPatient?.phc_id || 'PHC Hosakote'
+  }
+
+  // Mirrors the 5 visits shown in the Screening History timeline below.
+  const historyDataForPdf = [
+    { date: '14 Jan 2025', eye: 'OD', grade: 2, doctorAssessment: 'Doctor Accepted AI (Gr.2)', carePlan: 'Referral to Apex Eye Hospital' },
+    { date: '10 Oct 2024', eye: 'OS', grade: 1, doctorAssessment: 'Doctor Overrule (Gr.1)', carePlan: 'Routine 6-month follow-up' },
+    { date: '02 Jul 2024', eye: 'OD', grade: 1, doctorAssessment: 'Doctor Accepted AI (Gr.1)', carePlan: 'Routine monitoring' },
+    { date: '18 Apr 2024', eye: 'OD', grade: 1, doctorAssessment: 'Doctor Accepted AI (Gr.1)', carePlan: 'Routine monitoring' },
+    { date: '12 Jan 2024', eye: 'OS', grade: 0, doctorAssessment: 'Baseline Verified', carePlan: 'Annual re-screen' },
+  ]
+
+  const chartDataForPdf = [
+    { date: 'Jan 2024', grade: 0 },
+    { date: 'Apr 2024', grade: 1 },
+    { date: 'Jul 2024', grade: 1 },
+    { date: 'Oct 2024', grade: 1 },
+    { date: 'Jan 2025', grade: 2 },
+  ]
+
+  const latestAssessmentForPdf = {
+    eye: 'OD',
+    date: '14 Jan 2025',
+    confidence: 94,
+    findings: 'Inferotemporal microaneurysms and early hard exudates confirmed. Grad-CAM salience concordant with ETDRS Grade 2 Moderate NPDR criteria.',
+    carePlan: 'Referred to Apex Eye Hospital (Dr. Arjun Sharma) for dilated fundus examination and optical coherence tomography within 4 weeks. Patient advised to maintain glycemic target (HbA1c < 7.0%) and monitor blood pressure bi-weekly at PHC.'
+  }
+
+  const handleExportSummaryPdf = async () => {
+    if (isExportingPdf) return
+    setIsExportingPdf(true)
+    try {
+      const filenameSafeName = sanitizeFilenameSegment(patientDisplayName)
+      await exportNodeToPdf(pdfRef.current, `DRISHTI_History_${filenameSafeName}.pdf`)
+      showToast(`Patient summary exported as clinical PDF (${activePatientId}.pdf)`)
+    } catch (err) {
+      console.error('Export patient history PDF failed:', err)
+      showToast('PDF export failed — please try again.')
+    } finally {
+      setIsExportingPdf(false)
+    }
+  }
 
   const toggleVisit = (id) => {
     setExpandedVisits((prev) => ({
@@ -75,11 +133,6 @@ export default function PatientHistory() {
 
   const handlePrint = () => {
     setIsExportModalOpen(true)
-  }
-
-  const handleDownloadPdf = () => {
-    setIsExportModalOpen(false)
-    showToast(`Patient summary exported as clinical PDF (${activePatientId}.pdf)`)
   }
 
   return (
@@ -215,11 +268,12 @@ export default function PatientHistory() {
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
               <button
                 type="button"
-                onClick={handlePrint}
-                className="h-10 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-[#285943] text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer"
+                onClick={handleExportSummaryPdf}
+                disabled={isExportingPdf}
+                className="h-10 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-[#285943] text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
               >
-                <Download className="w-4 h-4" />
-                <span>Export Summary</span>
+                {isExportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                <span>{isExportingPdf ? 'Exporting...' : 'Export Summary'}</span>
               </button>
               <Link
                 to="/referrals"
@@ -1220,6 +1274,17 @@ export default function PatientHistory() {
           </div>
         </section>
       </main>
+
+      {/* Offscreen A4 report captured by handleExportSummaryPdf via html2canvas + jsPDF */}
+      <div style={{ position: 'fixed', top: 0, left: '-10000px', zIndex: -1 }} aria-hidden="true">
+        <PatientHistoryPDF
+          ref={pdfRef}
+          patient={patientForPdf}
+          historyData={historyDataForPdf}
+          latestAssessment={latestAssessmentForPdf}
+          chartData={chartDataForPdf}
+        />
+      </div>
 
       {/* Clinical A4 Printable Report Modal */}
       {isExportModalOpen && (

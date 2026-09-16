@@ -22,7 +22,9 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import GradeBadge from '../components/GradeBadge'
+import ScreeningReportPDF from '../components/ScreeningReportPDF'
 import { handleZoomIn, handleZoomOut, handleZoomReset } from '../lib/zoomHandlers'
+import { exportNodeToPdf, sanitizeFilenameSegment } from '../lib/pdfExport'
 import {
   qualityCheck,
   classify,
@@ -211,6 +213,10 @@ export default function Screening() {
 
   // Save/referral submission state — guards against double-submit
   const [isSaving, setIsSaving] = useState(false)
+
+  // Screening report PDF export
+  const [isExportingReport, setIsExportingReport] = useState(false)
+  const reportPdfRef = useRef(null)
 
   // Auto-select the patient just registered on the Register page (passed via
   // navigate('/screening', { state: { patientId, patientName } })).
@@ -457,6 +463,21 @@ export default function Screening() {
     navigate(gradeInfo.primaryActionRoute)
     // Not resetting isSaving — the page navigates away, so the button stays
     // disabled until this component unmounts.
+  }
+
+  // Export the current screening result as a single-visit A4 PDF report
+  const handleExportScreeningReport = async () => {
+    if (isExportingReport) return
+    setIsExportingReport(true)
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10)
+      const filenameSafeId = sanitizeFilenameSegment(String(selectedPatient.id))
+      await exportNodeToPdf(reportPdfRef.current, `DRISHTI_Screening_${filenameSafeId}_${dateStr}.pdf`)
+    } catch (err) {
+      console.error('Export screening report PDF failed:', err)
+    } finally {
+      setIsExportingReport(false)
+    }
   }
 
   const getStepIndex = (stepId) => STEPS.findIndex(s => s.id === stepId)
@@ -1089,10 +1110,10 @@ export default function Screening() {
                       <span>{gradeInfo.primaryActionLabel}</span>
                     )}
                   </button>
-                  <button type="button" onClick={() => window.print()}
-                    className="min-h-[44px] h-12 px-4 bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold text-xs rounded-xl border border-[#E2E7E3] transition-colors flex items-center justify-center gap-2 cursor-pointer">
-                    <Printer className="w-4 h-4 text-slate-500" />
-                    <span>Print Report</span>
+                  <button type="button" onClick={handleExportScreeningReport} disabled={isExportingReport}
+                    className="min-h-[44px] h-12 px-4 bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold text-xs rounded-xl border border-[#E2E7E3] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
+                    {isExportingReport ? <RefreshCw className="w-4 h-4 text-slate-500 animate-spin" /> : <Printer className="w-4 h-4 text-slate-500" />}
+                    <span>{isExportingReport ? 'Exporting...' : 'Print Report'}</span>
                   </button>
                 </div>
               </div>
@@ -1101,6 +1122,21 @@ export default function Screening() {
           </section>
         </div>
       </main>
+
+      {/* Offscreen A4 report captured by handleExportScreeningReport via html2canvas + jsPDF */}
+      <div style={{ position: 'fixed', top: 0, left: '-10000px', zIndex: -1 }} aria-hidden="true">
+        <ScreeningReportPDF
+          ref={reportPdfRef}
+          patient={selectedPatient}
+          activeGrade={activeGrade}
+          activeConfidence={activeConfidence}
+          activeEye={activeEye}
+          gradeInfo={gradeInfo}
+          gradcamUrl={heatmapUrl ? `https://drishti-ai-69kp.onrender.com${heatmapUrl}` : null}
+          recommendationText={recommendationText}
+          qualityScore={qualityScore}
+        />
+      </div>
     </div>
   )
 }

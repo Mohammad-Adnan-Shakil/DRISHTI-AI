@@ -9,6 +9,7 @@ import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
 import Skeleton from '../components/Skeleton'
 import { getPendingReferrals, getReferralStats, updateReferral } from '../lib/api'
+import { exportReferralsToCSV } from '../lib/csvExport'
 
 export default function Referrals() {
   const navigate = useNavigate()
@@ -97,6 +98,12 @@ export default function Referrals() {
 
   const isFiltered = searchQuery || statusFilter !== 'all' || urgencyFilter !== 'all' || phcFilter !== 'all'
 
+  const handleExportReferralLog = () => {
+    exportReferralsToCSV(filteredReferrals)
+    setShowExportToast(true)
+    setTimeout(() => setShowExportToast(false), 2500)
+  }
+
   const getStatusPill = (status) => (
     <span className="bg-transparent border border-[#E2E7E3] text-[#475569] px-2 py-1 rounded-full text-xs font-semibold inline-flex items-center whitespace-nowrap">{status}</span>
   )
@@ -150,7 +157,7 @@ export default function Referrals() {
                 <Calendar className="w-3.5 h-3.5 text-[#66756D]" />
                 <span>{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               </div>
-              <button type="button" onClick={() => { setShowExportToast(true); setTimeout(() => setShowExportToast(false), 2500) }}
+              <button type="button" onClick={handleExportReferralLog}
                 className="h-9 px-3.5 rounded-lg bg-white hover:bg-[#F8FAF7] border border-[#E2E7E3] text-[#20312A] text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer">
                 <Download className="w-4 h-4 text-[#66756D]" />
                 <span>Export Referral Log</span>

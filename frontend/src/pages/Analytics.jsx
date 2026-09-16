@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import AdminNavbar from '../components/AdminNavbar'
 import { getScreeningStats, getReferralStats } from '../lib/api'
+import { exportAnalyticsToCSV } from '../lib/csvExport'
 
 const MOCK_STATS = {
   total_screenings: 1248,
@@ -109,6 +110,25 @@ export default function Analytics() {
     { id: 'phc-performance', label: 'PHC Performance' }
   ]
 
+  const handleExportAnalyticsCsv = () => {
+    const kpiData = {
+      'Total Screenings': stats.total_screenings,
+      'Referable Cases (Grade >= 2)': stats.referable_cases,
+      'Referral Attendance Rate (%)': attendanceRate,
+      'Active PHCs': stats.active_phcs,
+      'Pending Reviews': stats.pending_reviews,
+      'Reviewed (30 Days)': stats.reviewed_30d,
+      'Median Time to Review': stats.median_review_time,
+      'AI Agreement Rate (%)': stats.ai_agreement_rate,
+      'Total Referrals': refStats.total,
+      'Referrals Attended': refStats.attended,
+      'Referrals No-Show': refStats.no_show,
+    }
+    exportAnalyticsToCSV(dateRange, kpiData, phcPerformance)
+    setShowExportToast(true)
+    setTimeout(() => setShowExportToast(false), 2500)
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAF7] flex flex-col antialiased text-[#20312A] pb-16">
       <AdminNavbar />
@@ -152,7 +172,7 @@ export default function Analytics() {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => { setShowExportToast(true); setTimeout(() => setShowExportToast(false), 2500) }}
+            <button type="button" onClick={handleExportAnalyticsCsv}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E7E3] rounded-lg shadow-xs text-xs font-semibold text-[#66756D] hover:text-[#20312A] hover:bg-[#F8FAF7] transition-colors cursor-pointer">
               <Download className="w-4 h-4 text-slate-500" /><span>Export CSV</span>
             </button>

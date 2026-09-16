@@ -4,7 +4,7 @@ import { Eye, Calendar, AlertTriangle, CheckCircle2, Users, Clock, ArrowRight, S
 import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
 import Skeleton from '../components/Skeleton'
-import { getPendingScreenings, getScreeningStats } from '../lib/api'
+import { getPendingScreenings, getReviewedScreenings, getScreeningStats } from '../lib/api'
 
 function getRailColor(grade) {
   if (grade >= 4) return 'border-l-[#991B1B]'
@@ -59,34 +59,45 @@ function dedupeByPatientAndTime(records) {
   return result
 }
 
+// Shared mapping from /screenings/pending and /screenings/reviewed rows
+// (same response shape) to the display format this page renders.
+function mapScreeningRows(rows) {
+  return rows.map(s => ({
+    id: s.patient_id || s.id || 'DRI-2026-00000',
+    name: s.patient_name || s.name || 'Patient',
+    phc: s.phc_id || 'PHC Hosakote',
+    drGrade: s.dr_grade ?? 0,
+    confidence: `${s.dr_confidence ?? 90}%`,
+    time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+    urgency: getUrgency(s.dr_grade ?? 0),
+    railColor: getRailColor(s.dr_grade ?? 0)
+  }))
+}
+
 export default function DoctorDashboard() {
   const navigate = useNavigate()
   const [filterSeverity, setFilterSeverity] = useState('all')
   const [queueData, setQueueData] = useState([])
+  const [reviewedData, setReviewedData] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [pendingRes, statsRes] = await Promise.allSettled([
+        const [pendingRes, reviewedRes, statsRes] = await Promise.allSettled([
           getPendingScreenings(),
+          getReviewedScreenings(),
           getScreeningStats()
         ])
 
         if (pendingRes.status === 'fulfilled' && pendingRes.value?.length > 0) {
           const deduped = dedupeByPatientAndTime(pendingRes.value)
-          const mapped = deduped.map(s => ({
-            id: s.patient_id || s.id || 'DRI-2026-00000',
-            name: s.patient_name || s.name || 'Patient',
-            phc: s.phc_id || 'PHC Hosakote',
-            drGrade: s.dr_grade ?? 0,
-            confidence: `${s.dr_confidence ?? 90}%`,
-            time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--',
-            urgency: getUrgency(s.dr_grade ?? 0),
-            railColor: getRailColor(s.dr_grade ?? 0)
-          }))
-          setQueueData(mapped)
+          setQueueData(mapScreeningRows(deduped))
+        }
+
+        if (reviewedRes.status === 'fulfilled' && reviewedRes.value?.length > 0) {
+          setReviewedData(mapScreeningRows(reviewedRes.value))
         }
 
         if (statsRes.status === 'fulfilled' && statsRes.value) {
@@ -106,7 +117,7 @@ export default function DoctorDashboard() {
     fetchData()
   }, [])
 
-  const filteredQueue = queueData.filter(item => {
+  const filteredQueue = filterSeverity === 'reviewed' ? reviewedData : queueData.filter(item => {
     if (filterSeverity === 'critical') return item.drGrade === 4
     if (filterSeverity === 'urgent') return item.drGrade === 3
     if (filterSeverity === 'moderate') return item.drGrade === 2
@@ -211,7 +222,8 @@ export default function DoctorDashboard() {
                   { id: 'all', label: `All (${queueData.length})` },
                   { id: 'critical', label: 'Grade 4 (1)' },
                   { id: 'urgent', label: 'Grade 3 (2)' },
-                  { id: 'moderate', label: 'Grade 2 (2)' }
+                  { id: 'moderate', label: 'Grade 2 (2)' },
+                  { id: 'reviewed', label: `Reviewed (${reviewedData.length})` }
                 ].map(tab => (
                   <button key={tab.id} type="button" onClick={() => setFilterSeverity(tab.id)}
                     className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${

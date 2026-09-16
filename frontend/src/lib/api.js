@@ -166,6 +166,15 @@ export async function markPatientScreeningsReviewed(patientId) {
 }
 
 /**
+ * GET /api/screenings/reviewed
+ * Same response shape as getPendingScreenings(), filtered to screenings
+ * the doctor has already reviewed (reviewed = true).
+ */
+export async function getReviewedScreenings() {
+  return get(LOCAL_URL, '/api/screenings/reviewed')
+}
+
+/**
  * GET /api/screenings/stats
  */
 export async function getScreeningStats() {
