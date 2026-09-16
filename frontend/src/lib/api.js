@@ -146,6 +146,26 @@ export async function getPendingScreenings() {
 }
 
 /**
+ * PATCH /api/patient/:patientId/screenings/review
+ * Marks all of a patient's pending (referral-recommended, unreviewed)
+ * screenings as reviewed — called when a doctor confirms & submits their
+ * review on the Doctor Review page. Removes the patient from the queue
+ * returned by getPendingScreenings().
+ * @param {string|number} patientId
+ * @returns {{ patient_id, reviewed_count }}
+ */
+export async function markPatientScreeningsReviewed(patientId) {
+  const res = await fetch(`${LOCAL_URL}/api/patient/${patientId}/screenings/review`, {
+    method: 'PATCH',
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`PATCH /api/patient/${patientId}/screenings/review failed [${res.status}]: ${err}`)
+  }
+  return res.json()
+}
+
+/**
  * GET /api/screenings/stats
  */
 export async function getScreeningStats() {

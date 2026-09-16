@@ -52,12 +52,37 @@ async def save_screening(data: ScreeningCreate, db: AsyncSession = Depends(get_d
     await db.refresh(screening)
     return screening
 
+@router.patch("/patient/{patient_id}/screenings/review")
+async def mark_patient_screenings_reviewed(patient_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Called when a doctor confirms/submits their review on the Doctor Review
+    page. Marks every pending (referral-recommended, not yet reviewed)
+    screening for this patient as reviewed, so they drop out of
+    /screenings/pending — the doctor's queue no longer shows them.
+    """
+    result = await db.execute(
+        select(Screening).where(
+            Screening.patient_id == patient_id,
+            Screening.referral_recommended == True,
+            Screening.reviewed == False
+        )
+    )
+    screenings = result.scalars().all()
+    if not screenings:
+        raise HTTPException(status_code=404, detail="No pending screenings found for this patient")
+
+    for screening in screenings:
+        screening.reviewed = True
+
+    await db.commit()
+    return {"patient_id": patient_id, "reviewed_count": len(screenings)}
+
 @router.get("/screenings/pending")
 async def get_pending_screenings(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Screening, Patient)
         .join(Patient, Screening.patient_id == Patient.id)
-        .where(Screening.referral_recommended == True)
+        .where(Screening.referral_recommended == True, Screening.reviewed == False)
         .order_by(Screening.created_at.desc())
     )
     rows = result.all()

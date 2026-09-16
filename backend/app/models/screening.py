@@ -16,6 +16,7 @@ class Screening(Base):
     vessel_map_url          = Column(String, nullable=True)
     risk_stratification     = Column(String, nullable=True)
     referral_recommended    = Column(Boolean, default=False)
+    reviewed                = Column(Boolean, default=False)
     recommendation_text     = Column(Text, nullable=True)
     recommendation_language = Column(String, default="english")
     created_at              = Column(DateTime(timezone=True), server_default=func.now())

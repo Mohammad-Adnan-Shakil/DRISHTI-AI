@@ -15,6 +15,7 @@ import {
 import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
 import { handleZoomIn, handleZoomOut, handleZoomReset } from '../lib/zoomHandlers'
+import { markPatientScreeningsReviewed } from '../lib/api'
 
 export default function DoctorReview() {
   const { id } = useParams()
@@ -67,8 +68,9 @@ export default function DoctorReview() {
   }
 
   // Submit Handler
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    if (isSubmitting) return // already submitting — ignore repeat clicks
 
     // Validation: if disagreeing/overriding AI, clinical assessment rationale is required
     if (!isAiAgreed && !overrideAssessment.trim()) {
@@ -83,13 +85,22 @@ export default function DoctorReview() {
       ? 'Review confirmed · Doctor concurred with AI'
       : 'Review confirmed · Doctor clinical assessment recorded'
 
-    setTimeout(() => {
+    try {
+      // patientId is numeric only for real, API-backed patients (route param
+      // from a queue built off getPendingScreenings()) — demo/mock patient
+      // IDs like 'DRI-2026-00419' have nothing to mark reviewed server-side.
+      if (/^\d+$/.test(patientId)) {
+        await markPatientScreeningsReviewed(patientId)
+      }
+    } catch (err) {
+      console.error('Failed to mark screening(s) reviewed:', err)
+    } finally {
       setIsSubmitting(false)
       setToastMessage(toast)
       setTimeout(() => {
         navigate('/doctor-dashboard')
       }, 1200)
-    }, 600)
+    }
   }
 
   const handleSaveDraft = () => {
