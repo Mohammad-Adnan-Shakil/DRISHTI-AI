@@ -3,7 +3,6 @@ import onnxruntime as ort
 from torchvision import transforms
 from PIL import Image
 from pathlib import Path
-import urllib.request
 
 GRADE_LABELS = {
     0: "No DR", 1: "Mild DR", 2: "Moderate DR",
@@ -18,9 +17,8 @@ RISK_MAP = {
     4: {"risk": "Critical", "action": "Urgent referral within 48 hours"}
 }
 
-HF_BASE = "https://huggingface.co/adnshkl/drishti-efficientnet-b4-dr/resolve/main"
-ONNX_PATH = Path("/tmp/efficientnet_b4_dr.onnx")
-ONNX_DATA_PATH = Path("/tmp/efficientnet_b4_dr.onnx.data")
+ONNX_PATH = Path("../ml/models/efficientnet_b4_dr.onnx")
+ONNX_DATA_PATH = Path("../ml/models/efficientnet_b4_dr.onnx.data")
 
 class DRClassifier:
     def __init__(self):
@@ -36,16 +34,7 @@ class DRClassifier:
         if self._session is not None:
             return self._session
 
-        if not ONNX_PATH.exists():
-            print("[MODEL] Downloading ONNX model...")
-            urllib.request.urlretrieve(f"{HF_BASE}/efficientnet_b4_dr.onnx", ONNX_PATH)
-            print("[MODEL] ONNX file downloaded.")
-
-        if not ONNX_DATA_PATH.exists():
-            print("[MODEL] Downloading ONNX data file...")
-            urllib.request.urlretrieve(f"{HF_BASE}/efficientnet_b4_dr.onnx.data", ONNX_DATA_PATH)
-            print("[MODEL] ONNX data file downloaded.")
-
+        print("[MODEL] Loading ONNX model from local files...")
         self._session = ort.InferenceSession(
             str(ONNX_PATH),
             providers=["CPUExecutionProvider"]
@@ -53,12 +42,18 @@ class DRClassifier:
         print("[MODEL] ONNX session loaded — 92.8% sensitivity")
         return self._session
 
+    @property
+    def session(self):
+        """Public accessor for callers (e.g. gradcam_service) that need to
+        run the ONNX session directly instead of through predict()."""
+        return self._get_session()
+
     def predict(self, image: Image.Image):
         session = self._get_session()
-        tensor  = self.transform(image).unsqueeze(0).numpy()
-        logits  = session.run(None, {"input": tensor})[0][0]
-        probs   = np.exp(logits) / np.sum(np.exp(logits))
-        grade   = int(np.argmax(probs))
+        tensor = self.transform(image).unsqueeze(0).numpy()
+        logits = session.run(None, {"input": tensor})[0][0]
+        probs = np.exp(logits) / np.sum(np.exp(logits))
+        grade = int(np.argmax(probs))
         confidence = round(float(probs[grade]) * 100, 2)
         return {
             "grade":      grade,
