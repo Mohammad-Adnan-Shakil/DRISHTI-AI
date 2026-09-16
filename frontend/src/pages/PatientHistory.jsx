@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -24,11 +24,29 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import GradeBadge from '../components/GradeBadge'
+import { getPatient } from '../lib/api'
+import { cn, RISK_TIER_STYLES } from '../lib/utils'
 
 export default function PatientHistory() {
   const navigate = useNavigate()
   const { patientId } = useParams()
   const activePatientId = patientId || 'DRI-2026-00421'
+
+  // Risk Score tier is only available for real, API-backed patients
+  // (numeric IDs from POST /api/patient) — demo/mock patient IDs have none.
+  const [apiPatient, setApiPatient] = useState(null)
+
+  useEffect(() => {
+    if (!/^\d+$/.test(activePatientId)) {
+      setApiPatient(null)
+      return
+    }
+    let cancelled = false
+    getPatient(activePatientId)
+      .then(p => { if (!cancelled) setApiPatient(p) })
+      .catch(() => { if (!cancelled) setApiPatient(null) })
+    return () => { cancelled = true }
+  }, [activePatientId])
 
   const [activeLayer, setActiveLayer] = useState('original') // 'original' | 'gradcam' | 'vessels'
   const [expandedVisits, setExpandedVisits] = useState({
@@ -178,6 +196,14 @@ export default function PatientHistory() {
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Active Cohort
                   </span>
+                  {apiPatient?.risk_tier && (
+                    <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-bold', RISK_TIER_STYLES[apiPatient.risk_tier])}>
+                      {apiPatient.risk_tier}
+                      {apiPatient.risk_score_total != null && (
+                        <span className="font-mono font-semibold opacity-80">({apiPatient.risk_score_total}/18)</span>
+                      )}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs sm:text-sm text-slate-500">
                   52 yrs • Female • PHC Hosakote • Primary ABHA ID: <span className="font-mono text-slate-700 font-medium">91-4829-1049-2210</span>

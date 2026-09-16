@@ -1,8 +1,74 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Check, User, FileText, Globe, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
+import { Check, User, FileText, Globe, AlertCircle, ArrowRight, Loader2, ShieldAlert } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { createPatient } from '../lib/api'
+import { cn, RISK_TIER_STYLES, getRiskTierFromScore } from '../lib/utils'
+
+// Registration-time Risk Score — 7 weighted clinical factors, max 18 points,
+// captured before any AI screening exists so PHC staff can triage on sight.
+const RISK_SCORE_FIELDS = [
+  {
+    key: 'diabetesDurationScore',
+    label: 'Duration of Diabetes',
+    options: [
+      { label: '< 5 years', score: 0 },
+      { label: '5 – 10 years', score: 1 },
+      { label: '10 – 15 years', score: 2 },
+      { label: '> 15 years', score: 3 }
+    ]
+  },
+  {
+    key: 'hba1cScore',
+    label: 'HbA1c',
+    options: [
+      { label: '< 7%', score: 0 },
+      { label: '7% – 8.5%', score: 1 },
+      { label: '8.5% – 10%', score: 2 },
+      { label: '> 10%', score: 3 }
+    ]
+  },
+  {
+    key: 'bpStatusScore',
+    label: 'BP Status',
+    options: [
+      { label: 'Controlled / No HTN', score: 0 },
+      { label: 'Diagnosed HTN, Controlled', score: 1 },
+      { label: 'Uncontrolled (> 140 systolic)', score: 2 }
+    ]
+  },
+  {
+    key: 'renalMarkerScore',
+    label: 'Renal Marker',
+    options: [
+      { label: 'Normal', score: 0 },
+      { label: 'Microalbuminuria', score: 2 },
+      { label: 'Overt Proteinuria', score: 3 }
+    ]
+  },
+  {
+    key: 'priorDrHistoryScore',
+    label: 'Prior DR / Laser / Anti-VEGF History',
+    options: [
+      { label: 'None', score: 0 },
+      { label: 'Prior Mild NPDR', score: 2 },
+      { label: 'Prior Moderate–Severe DR / Laser / Anti-VEGF', score: 4 }
+    ]
+  },
+  {
+    key: 'smokingStatusScore',
+    label: 'Smoking Status',
+    options: [
+      { label: 'Never / Former Smoker', score: 0 },
+      { label: 'Current Smoker', score: 1 }
+    ]
+  }
+]
+
+const INSULIN_USE_OPTIONS = [
+  { label: 'No', score: 0 },
+  { label: 'Yes', score: 2 }
+]
 
 export default function Register() {
   const navigate = useNavigate()
@@ -17,8 +83,25 @@ export default function Register() {
     hypertension: 'Yes',
     familyHistory: 'No',
     preferredLanguage: '',
-    phcId: 'PHC-HOSAKOTE'
+    phcId: 'PHC-HOSAKOTE',
+    // Risk Score section — values hold the selected option's score (number) or '' if unselected
+    diabetesDurationScore: '',
+    hba1cScore: '',
+    bpStatusScore: '',
+    renalMarkerScore: '',
+    insulinUseScore: 0,
+    priorDrHistoryScore: '',
+    smokingStatusScore: ''
   })
+
+  const riskScoreTotal = useMemo(() => {
+    return RISK_SCORE_FIELDS.reduce((sum, field) => {
+      const val = formData[field.key]
+      return sum + (val === '' || val == null ? 0 : Number(val))
+    }, Number(formData.insulinUseScore) || 0)
+  }, [formData])
+
+  const riskTierLabel = useMemo(() => getRiskTierFromScore(riskScoreTotal), [riskScoreTotal])
 
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -62,7 +145,16 @@ export default function Register() {
         hba1c_level: formData.hba1c ? parseFloat(formData.hba1c) : null,
         hypertension: formData.hypertension === 'Yes',
         family_history_dr: formData.familyHistory === 'Yes',
-        preferred_language: formData.preferredLanguage
+        preferred_language: formData.preferredLanguage,
+        diabetes_duration_score: formData.diabetesDurationScore === '' ? null : Number(formData.diabetesDurationScore),
+        hba1c_score: formData.hba1cScore === '' ? null : Number(formData.hba1cScore),
+        bp_status_score: formData.bpStatusScore === '' ? null : Number(formData.bpStatusScore),
+        renal_marker_score: formData.renalMarkerScore === '' ? null : Number(formData.renalMarkerScore),
+        insulin_use_score: Number(formData.insulinUseScore) || 0,
+        prior_dr_history_score: formData.priorDrHistoryScore === '' ? null : Number(formData.priorDrHistoryScore),
+        smoking_status_score: formData.smokingStatusScore === '' ? null : Number(formData.smokingStatusScore),
+        risk_score_total: riskScoreTotal,
+        risk_tier: riskTierLabel
       })
       // Use returned ID if available
       if (result?.id) {
@@ -231,7 +323,7 @@ export default function Register() {
               </div>
 
               {/* SECTION C: Care Context */}
-              <div className="space-y-5">
+              <div className="space-y-5 pb-6 border-b border-[#E2E7E3]">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-[#E6F4EA] text-[#047857] flex items-center justify-center shrink-0 shadow-2xs"><Globe className="w-4 h-4" /></div>
                   <div>
@@ -261,6 +353,54 @@ export default function Register() {
                       className="touch-target w-full h-11 rounded-xl border border-[#E2E7E3] bg-[#F8FAF7] px-3.5 text-sm font-semibold text-[#20312A] cursor-not-allowed select-all" />
                     <p className="text-[11px] text-[#66756D] mt-1">Locked to logged-in screening unit</p>
                   </div>
+                </div>
+              </div>
+
+              {/* SECTION D: Risk Score */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-[#E6F4EA] text-[#047857] flex items-center justify-center shrink-0 shadow-2xs"><ShieldAlert className="w-4 h-4" /></div>
+                  <div>
+                    <h2 className="font-heading font-bold text-base text-[#20312A] tracking-tight">D. Risk Score</h2>
+                    <p className="text-xs text-[#66756D]">Weighted clinical risk profile (max 18 points) — optional, refines triage before screening</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-1">
+                  {RISK_SCORE_FIELDS.map(field => (
+                    <div key={field.key}>
+                      <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor={field.key}>{field.label}</label>
+                      <select id={field.key} value={formData[field.key]} onChange={(e) => handleInputChange(field.key, e.target.value)}
+                        className="touch-target w-full h-11 rounded-xl border border-[#E2E7E3] bg-white px-3.5 pr-10 text-sm text-[#20312A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] appearance-none cursor-pointer transition-all">
+                        <option value="">Not assessed</option>
+                        {field.options.map(opt => (
+                          <option key={opt.label} value={opt.score}>{opt.label} ({opt.score} pt{opt.score === 1 ? '' : 's'})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-800 mb-2">Insulin Use</label>
+                    <div className="grid grid-cols-2 gap-2" role="group">
+                      {INSULIN_USE_OPTIONS.map(opt => (
+                        <button key={opt.label} type="button" onClick={() => handleInputChange('insulinUseScore', opt.score)}
+                          className={`touch-target h-11 flex items-center justify-center rounded-xl text-sm transition-all cursor-pointer ${Number(formData.insulinUseScore) === opt.score ? 'bg-[#E6F4EA] text-[#14532D] font-bold border border-[#A7F3D0] shadow-xs' : 'bg-white border border-[#E2E7E3] text-[#66756D] hover:bg-slate-50 font-medium'}`}>
+                          {opt.label} ({opt.score} pt{opt.score === 1 ? '' : 's'})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Auto-calculated total + tier */}
+                <div className={cn('flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border p-4', RISK_TIER_STYLES[riskTierLabel])}>
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 shrink-0" />
+                    <span className="text-sm font-semibold">Total Risk Score: <span className="font-mono font-extrabold">{riskScoreTotal}</span> / 18</span>
+                  </div>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border bg-white/60">
+                    {riskTierLabel}
+                  </span>
                 </div>
               </div>
 

@@ -20,6 +20,17 @@ class PatientCreate(BaseModel):
     family_history_dr: bool = False
     preferred_language: str = "english"
 
+    # Registration-time risk score inputs (see Register Patient "Risk Score" section)
+    diabetes_duration_score: Optional[int] = None
+    hba1c_score: Optional[int] = None
+    bp_status_score: Optional[int] = None
+    renal_marker_score: Optional[int] = None
+    insulin_use_score: Optional[int] = None
+    prior_dr_history_score: Optional[int] = None
+    smoking_status_score: Optional[int] = None
+    risk_score_total: Optional[int] = None
+    risk_tier: Optional[str] = None
+
 class PatientResponse(BaseModel):
     id: int
     name: str
@@ -32,6 +43,16 @@ class PatientResponse(BaseModel):
     hypertension: bool
     family_history_dr: bool
     preferred_language: str
+
+    diabetes_duration_score: Optional[int] = None
+    hba1c_score: Optional[int] = None
+    bp_status_score: Optional[int] = None
+    renal_marker_score: Optional[int] = None
+    insulin_use_score: Optional[int] = None
+    prior_dr_history_score: Optional[int] = None
+    smoking_status_score: Optional[int] = None
+    risk_score_total: Optional[int] = None
+    risk_tier: Optional[str] = None
 
     class Config:
         from_attributes = True
