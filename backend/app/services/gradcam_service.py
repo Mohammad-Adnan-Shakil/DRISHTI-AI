@@ -24,7 +24,7 @@ transform = transforms.Compose([
 def generate_gradcam(image_path: str, target_grade: int = None) -> dict:
     # Load image
     pil_img = Image.open(image_path).convert("RGB")
-    input_tensor = transform(pil_img).unsqueeze(0).to(classifier.device)
+    input_tensor = transform(pil_img).unsqueeze(0)
 
     # Get predicted grade if not specified
     if target_grade is None:
