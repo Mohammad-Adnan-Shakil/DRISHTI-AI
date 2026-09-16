@@ -133,6 +133,7 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (isSubmitting) return // already submitting — ignore repeat clicks
     if (!validate()) return
 
     setIsSubmitting(true)
@@ -165,13 +166,12 @@ export default function Register() {
         setRegisteredName(result.name || formData.fullName)
       }
       setIsRegistered(true)
+      // Not resetting isSubmitting here — isRegistered gates the form's render,
+      // so the button unmounts along with it rather than re-appearing enabled.
     } catch (err) {
       console.error('Register patient failed:', err)
-      setApiError('Could not connect to server. Patient saved locally for sync.')
-      // Still show success for demo continuity
-      setIsRegistered(true)
-    } finally {
-      setIsSubmitting(false)
+      setApiError('Could not connect to server. Please try again.')
+      setIsSubmitting(false) // allow the user to retry
     }
   }
 
