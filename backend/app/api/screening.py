@@ -67,11 +67,14 @@ async def get_pending_screenings(db: AsyncSession = Depends(get_db)):
             "patient_id": p.id,
             "patient_name": p.name,
             "patient_age": p.age,
+            "phc_id": p.phc_id,
             "dr_grade": s.dr_grade,
+            "dr_confidence": s.dr_confidence,
             "dme_present": s.dme_present,
             "risk_stratification": s.risk_stratification,
             "heatmap_url": s.heatmap_url,
             "recommendation_text": s.recommendation_text,
+            "referral_recommended": s.referral_recommended,
             "created_at": s.created_at.isoformat() if s.created_at else None
         }
         for s, p in rows
@@ -90,11 +93,13 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         select(Screening.dr_grade, func.count(Screening.id))
         .group_by(Screening.dr_grade)
     )
+    total_patients = await db.execute(select(func.count(Patient.id)))
     return {
         "total_screenings": total.scalar(),
         "referrals_recommended": referrals.scalar(),
         "dme_cases": dme_cases.scalar(),
-        "grade_distribution": {str(g): c for g, c in grade_dist.all()}
+        "grade_distribution": {str(g): c for g, c in grade_dist.all()},
+        "total_patients": total_patients.scalar()
     }
 
 @router.get("/screening/{screening_id}", response_model=ScreeningResponse)
