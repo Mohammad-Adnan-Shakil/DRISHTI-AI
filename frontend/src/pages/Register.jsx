@@ -10,7 +10,7 @@ import { cn, RISK_TIER_STYLES, getRiskTierFromScore } from '../lib/utils'
 const RISK_SCORE_FIELDS = [
   {
     key: 'diabetesDurationScore',
-    label: 'Duration of Diabetes',
+    label: 'Diabetes Duration (Risk Category)',
     options: [
       { label: '< 5 years', score: 0 },
       { label: '5 – 10 years', score: 1 },
@@ -20,7 +20,7 @@ const RISK_SCORE_FIELDS = [
   },
   {
     key: 'hba1cScore',
-    label: 'HbA1c',
+    label: 'HbA1c Level (Risk Category)',
     options: [
       { label: '< 7%', score: 0 },
       { label: '7% – 8.5%', score: 1 },
