@@ -320,6 +320,11 @@ export default function Register() {
                     <p className="text-[11px] text-[#66756D] mt-1">First-degree relatives diagnosed</p>
                   </div>
 
+                  {/* Divider + subheading separating clinical inputs from risk scoring */}
+                  <div className="sm:col-span-2 pt-2 pb-1 border-t border-[#E2E7E3] flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#66756D] mt-2">Risk Stratification Score</span>
+                  </div>
+
                   {/* Risk Score fields — weighted clinical risk profile (max 18 points) */}
                   {RISK_SCORE_FIELDS.map(field => (
                     <div key={field.key}>
