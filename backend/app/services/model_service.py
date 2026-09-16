@@ -12,7 +12,7 @@ GRADE_LABELS = {
 RISK_MAP = {
     0: {"risk": "No Risk", "action": "Monitor annually"},
     1: {"risk": "Low Risk", "action": "Monitor every 6 months"},
-    2: {"risk": "Moderate Risk", "action": "Refer within 3 months"},
+    2: {"risk": "Moderate Risk", "action": "Refer within 2-4 weeks"},
     3: {"risk": "High Risk", "action": "Refer within 2 weeks"},
     4: {"risk": "Critical", "action": "Urgent referral within 48 hours"}
 }

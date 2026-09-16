@@ -23,7 +23,7 @@ DR_GRADE_LABELS = {
 RISK_ACTIONS = {
     0: "annual screening",
     1: "follow-up in 6 months",
-    2: "referral to ophthalmologist within 3 months",
+    2: "referral to ophthalmologist within 2 to 4 weeks",
     3: "urgent referral within 2 weeks",
     4: "emergency referral within 48 hours"
 }

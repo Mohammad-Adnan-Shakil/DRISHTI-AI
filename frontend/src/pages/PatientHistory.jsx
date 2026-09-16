@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
-  Printer,
   Download,
   Info,
   CheckCircle2,
@@ -59,7 +58,6 @@ export default function PatientHistory() {
     '2024-04': false,
     '2024-01': false,
   })
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const pdfRef = useRef(null)
@@ -149,10 +147,6 @@ export default function PatientHistory() {
     }, 3500)
   }
 
-  const handlePrint = () => {
-    setIsExportModalOpen(true)
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A]">
       {/* Toast Notification */}
@@ -226,16 +220,6 @@ export default function PatientHistory() {
               <span className="text-slate-300">/</span>
               <span className="text-slate-900 font-semibold">{displayPatient.name} ({activePatientId})</span>
             </nav>
-          </div>
-          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-[#285943] font-semibold text-xs sm:text-sm shadow-xs transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Print Summary</span>
-            </button>
           </div>
         </div>
 
@@ -1299,198 +1283,6 @@ export default function PatientHistory() {
           chartData={chartDataForPdf}
         />
       </div>
-
-      {/* Clinical A4 Printable Report Modal */}
-      {isExportModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-          <div className="bg-[#FFFFFF] rounded-2xl max-w-2xl w-full p-6 sm:p-8 border border-[#E2E7E3] shadow-2xl space-y-6 animate-in fade-in zoom-in-95 duration-200 text-[#20312A] max-h-[92vh] overflow-y-auto">
-            {/* Modal Top Chrome: DRISHTI Logo & Header */}
-            <div className="flex items-start justify-between border-b border-[#E2E7E3] pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full p-2 bg-gradient-to-br from-[#E6F4EA] to-[#CCFBF1] text-[#047857] flex items-center justify-center shadow-xs shrink-0">
-                  <Eye className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-extrabold tracking-tight text-[#20312A] font-heading">DRISHTI</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E6F4EA] text-[#047857]">
-                      Clinical Tele-Retina
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#66756D]">
-                    National Tele-Ophthalmology Network · Longitudinal Patient Assessment Report
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsExportModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Demographics Grid */}
-            <div className="bg-[#F8FAF7] rounded-xl border border-[#E2E7E3] p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#66756D] block">Patient Name</span>
-                <span className="font-bold text-[#20312A] text-sm">{displayPatient.name}</span>
-                <span className="text-[11px] text-[#66756D] block">{displayPatient.ageGender}</span>
-              </div>
-              <div>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#66756D] block">Patient ID / ABHA</span>
-                <span className="font-mono font-semibold text-[#20312A]">{activePatientId}</span>
-                <span className="text-[10px] font-mono text-[#66756D] block">{displayPatient.abhaId}</span>
-              </div>
-              <div>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#66756D] block">Care History</span>
-                <span className="font-medium text-[#20312A]">Type II DM ({displayPatient.diabetesDuration})</span>
-                <span className="text-[11px] text-[#66756D] block">HbA1c: {displayPatient.hba1c}</span>
-              </div>
-              <div>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#66756D] block">Primary Facility</span>
-                <span className="font-medium text-[#20312A]">{displayPatient.phc}</span>
-              </div>
-            </div>
-
-            {/* 5-Visit Trend Summary */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#20312A] font-heading">
-                  5-Visit Longitudinal DR Progression
-                </h4>
-                <span className="text-[11px] text-[#66756D] font-medium">Jan 2024 – Jan 2025</span>
-              </div>
-              <div className="overflow-x-auto rounded-xl border border-[#E2E7E3]">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-[#F8FAF7] text-[#66756D] text-[10px] font-semibold uppercase border-b border-[#E2E7E3]">
-                    <tr>
-                      <th className="py-2 px-3">Date</th>
-                      <th className="py-2 px-2">Eye</th>
-                      <th className="py-2 px-3">AI Grade</th>
-                      <th className="py-2 px-3">Doctor Assessment</th>
-                      <th className="py-2 px-3 text-right">Care Plan</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E2E7E3] text-xs">
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#20312A]">15 Jan 2025</td>
-                      <td className="py-2 px-2 font-mono text-[#66756D]">OD</td>
-                      <td className="py-2 px-3"><GradeBadge grade={2} /></td>
-                      <td className="py-2 px-3 font-semibold text-[#0D9488]">Accepted Gr.2</td>
-                      <td className="py-2 px-3 text-right text-red-700 font-bold">Referral to Apex</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#20312A]">10 Oct 2024</td>
-                      <td className="py-2 px-2 font-mono text-[#66756D]">OS</td>
-                      <td className="py-2 px-3"><GradeBadge grade={1} /></td>
-                      <td className="py-2 px-3 text-[#66756D]">Doctor Overrule (Gr.1)</td>
-                      <td className="py-2 px-3 text-right text-[#66756D]">Routine 6-mo follow-up</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#20312A]">02 Jul 2024</td>
-                      <td className="py-2 px-2 font-mono text-[#66756D]">OD</td>
-                      <td className="py-2 px-3"><GradeBadge grade={1} /></td>
-                      <td className="py-2 px-3 text-[#66756D]">Accepted Gr.1</td>
-                      <td className="py-2 px-3 text-right text-[#66756D]">Routine monitoring</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#20312A]">18 Apr 2024</td>
-                      <td className="py-2 px-2 font-mono text-[#66756D]">OS</td>
-                      <td className="py-2 px-3"><GradeBadge grade={1} /></td>
-                      <td className="py-2 px-3 text-[#66756D]">Accepted Gr.1</td>
-                      <td className="py-2 px-3 text-right text-[#66756D]">Routine monitoring</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#20312A]">12 Jan 2024</td>
-                      <td className="py-2 px-2 font-mono text-[#66756D]">OD</td>
-                      <td className="py-2 px-3"><GradeBadge grade={0} /></td>
-                      <td className="py-2 px-3 text-[#047857] font-semibold">Baseline Verified</td>
-                      <td className="py-2 px-3 text-right text-[#66756D]">Annual re-screen</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Fundus Thumbnail Preview & Findings */}
-            <div className="p-3.5 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="w-24 h-24 rounded-lg bg-slate-950 overflow-hidden border border-slate-800 shrink-0 relative shadow-xs">
-                <svg className="w-full h-full object-cover select-none" viewBox="0 0 200 200">
-                  <rect fill="#1A0B08" height="200" width="200" />
-                  <circle cx="100" cy="100" fill="#8B2500" opacity="0.9" r="80" />
-                  <circle cx="100" cy="100" fill="#A83200" r="72" />
-                  <circle cx="65" cy="98" fill="#FFC266" r="16" />
-                  <circle cx="130" cy="102" fill="#5A1800" opacity="0.6" r="12" />
-                  <path d="M65 98 Q95 50 145 42" fill="none" stroke="#400A04" strokeWidth="2.5" />
-                  <path d="M65 98 Q105 145 150 152" fill="none" stroke="#400A04" strokeWidth="2.5" />
-                  <circle cx="118" cy="85" fill="#FF1A1A" r="3" />
-                  <circle cx="128" cy="120" fill="#FF1A1A" r="2.5" />
-                </svg>
-                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/80 text-[8px] font-mono text-white">
-                  OD · 15 Jan
-                </span>
-              </div>
-              <div className="space-y-1 text-xs text-[#20312A] flex-1">
-                <div className="font-bold flex items-center gap-2">
-                  <span>Latest Fundus Inspection (15 Jan 2025)</span>
-                  <span className="text-[10px] font-mono text-[#0D9488] bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded font-semibold">
-                    94% Model Confidence
-                  </span>
-                </div>
-                <p className="text-[#66756D] leading-relaxed">
-                  Inferotemporal microaneurysms and early hard exudates confirmed. Grad-CAM salience concordant with ETDRS Grade 2 Moderate NPDR criteria.
-                </p>
-                <div className="text-[11px] text-[#20312A] font-semibold pt-0.5">
-                  Attending Clinician: Dr. Arjun Sharma (KMC-44819) · Confirmed &amp; Signed
-                </div>
-              </div>
-            </div>
-
-            {/* Care Instructions */}
-            <div className="p-3.5 rounded-xl bg-teal-50/70 border border-[#0D9488]/30 space-y-1 text-xs">
-              <div className="font-bold text-[#0D9488] uppercase tracking-wide flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Care Instructions &amp; Referral Action Plan</span>
-              </div>
-              <p className="text-[#20312A] leading-relaxed">
-                Referred to <strong>Apex Eye Hospital (Dr. Arjun Sharma)</strong> for dilated fundus examination and optical coherence tomography within 4 weeks. Patient advised to maintain glycemic target (HbA1c &lt; 7.0%) and monitor blood pressure bi-weekly at PHC.
-              </p>
-            </div>
-
-            {/* Medical Disclaimer */}
-            <div className="flex items-start gap-2 text-[10px] text-[#66756D] leading-relaxed border-t border-[#E2E7E3] pt-3">
-              <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-              <p>
-                <strong>Medical Disclaimer:</strong> This clinical document is produced under the National Tele-Ophthalmology Screening Protocol. AI outputs serve as clinical decision support for licensed medical practitioners and do not substitute for definitive ophthalmic examination.
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#E2E7E3]">
-              <button
-                type="button"
-                onClick={() => setIsExportModalOpen(false)}
-                className="min-h-[44px] px-4 py-2 rounded-xl bg-white hover:bg-[#F8FAF7] border border-[#E2E7E3] text-[#20312A] text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsExportModalOpen(false)
-                  window.print()
-                  showToast(`Clinical summary sent to print for ${activePatientId}`)
-                }}
-                className="btn-gradient-pill min-h-[44px] px-6 py-2.5 text-xs sm:text-sm font-bold inline-flex items-center gap-2 shadow-xs hover:brightness-105 hover:shadow-md transition-all cursor-pointer"
-              >
-                <span>🖨️ Print Report</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

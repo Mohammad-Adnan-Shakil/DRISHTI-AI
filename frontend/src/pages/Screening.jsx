@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   FileText,
   Printer,
-  Sliders
+  Sliders,
+  ImageOff
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import GradeBadge from '../components/GradeBadge'
@@ -177,6 +178,7 @@ export default function Screening() {
   const navigate = useNavigate()
   const location = useLocation()
   const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
 
   const [screeningStep, setScreeningStep] = useState('capture')
   const [selectedPatientId, setSelectedPatientId] = useState('DRI-2026-00421')
@@ -187,7 +189,6 @@ export default function Screening() {
   const [activeEye, setActiveEye] = useState('OD')
   const [activeLayer, setActiveLayer] = useState('original')
   const [zoomLevel, setZoomLevel] = useState(1.0)
-  const [isCapturing, setIsCapturing] = useState(false)
   const [hasImage, setHasImage] = useState(false)
   const [uploadedFile, setUploadedFile] = useState(null)
 
@@ -351,17 +352,6 @@ export default function Screening() {
     if (file) handleUploadImage(file)
   }
 
-  // Camera capture simulation
-  const handleCaptureImage = () => {
-    setIsCapturing(true)
-    setTimeout(() => {
-      setIsCapturing(false)
-      setHasImage(true)
-      setScreeningStep('quality-check')
-      setQualityScore(92)
-    }, 1200)
-  }
-
   // AI Pipeline — real API calls
   const startAIAnalysis = async () => {
     setScreeningStep('processing')
@@ -485,11 +475,19 @@ export default function Screening() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] pb-16 md:pb-12">
-      {/* Hidden file input */}
+      {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         className="hidden"
         onChange={handleFileInputChange}
       />
@@ -770,6 +768,16 @@ export default function Screening() {
 
               {/* FUNDUS DISPLAY */}
               <div className="relative w-full aspect-square max-h-[380px] sm:max-h-[440px] mx-auto bg-slate-950 rounded-2xl overflow-hidden shadow-inner border border-slate-800 flex items-center justify-center group">
+                {!hasImage ? (
+                  <div className="flex flex-col items-center justify-center gap-3 text-center px-6">
+                    <ImageOff className="w-12 h-12 text-slate-600" />
+                    <div>
+                      <p className="text-sm font-semibold text-slate-300">No fundus image captured yet</p>
+                      <p className="text-xs text-slate-500 mt-1">Use Capture Image or Upload from Device below to begin</p>
+                    </div>
+                  </div>
+                ) : (
+                <>
                 <div className="w-full h-full flex items-center justify-center transition-transform duration-200" style={{ transform: `scale(${zoomLevel})` }}>
                   {/* Show real heatmap if available and gradcam layer selected */}
                   {activeLayer === 'gradcam' && heatmapUrl ? (
@@ -859,15 +867,17 @@ export default function Screening() {
                     <span>Retake</span>
                   </button>
                 </div>
+                </>
+                )}
               </div>
 
               {/* ACTION BUTTONS */}
               {!hasImage ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                  <button type="button" onClick={handleCaptureImage} disabled={isCapturing}
+                  <button type="button" onClick={() => cameraInputRef.current?.click()}
                     className="btn-gradient-pill min-h-[44px] h-12 px-5 text-sm font-bold shadow-xs hover:brightness-105 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer focus:outline-none">
                     <Camera className="w-5 h-5 text-[#14532D]" />
-                    <span>{isCapturing ? 'Acquiring Image...' : 'Capture Image'}</span>
+                    <span>Capture Image</span>
                   </button>
                   <button type="button" onClick={() => fileInputRef.current?.click()}
                     className="min-h-[44px] h-12 px-5 bg-white hover:bg-[#E6F4EA] text-[#20312A] font-semibold text-sm rounded-xl border border-[#E2E7E3] shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer">

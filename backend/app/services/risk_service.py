@@ -46,8 +46,8 @@
         # Grade 2+ always referral regardless of other factors
         if dr_grade == 2:
             risk_level = "high"
-            follow_up_months = 3
-            action = "Refer to ophthalmologist within 3 months"
+            follow_up_months = 0.75  # ~3 weeks, midpoint of the 2-4 week window
+            action = "Refer to ophthalmologist within 2-4 weeks"
         elif dr_grade == 3:
             risk_level = "high"
             follow_up_months = 0.5  # 2 weeks
