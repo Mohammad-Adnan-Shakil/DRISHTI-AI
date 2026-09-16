@@ -7,20 +7,8 @@ import {
 } from 'lucide-react'
 import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
+import Skeleton from '../components/Skeleton'
 import { getPendingReferrals, getReferralStats, updateReferral } from '../lib/api'
-
-const MOCK_REFERRALS = [
-  { id: 'DRI-2026-00419', name: 'Ravi T.', drGrade: 4, phc: 'PHC Chelur', urgency: 'Critical · 24-48h', urgencyType: 'critical', referredOn: 'Today, 8:10 AM', status: 'Pending', aiConfidence: '94%', doctorStance: 'Confirmed by Dr. Arjun Sharma', handoffNotes: 'Preretinal hemorrhages confirmed. Urgent vitreoretinal transport required.' },
-  { id: 'DRI-2026-00411', name: 'Mahesh K.', drGrade: 3, phc: 'PHC Hosakote', urgency: 'Urgent · 48h', urgencyType: 'urgent', referredOn: 'Yesterday, 4:25 PM', status: 'Sent', aiConfidence: '91%', doctorStance: 'Confirmed by Dr. Arjun Sharma', handoffNotes: 'Extensive microaneurysms, venous beading. Transport confirmed.' },
-  { id: 'DRI-2026-00421', name: 'Anitha R.', drGrade: 2, phc: 'PHC Hosakote', urgency: 'High · 7 Days', urgencyType: 'high', referredOn: 'Today, 9:30 AM', status: 'Pending', aiConfidence: '89%', doctorStance: 'Confirmed by Dr. Arjun Sharma', handoffNotes: 'Hard exudates approaching macula. OPD slot within 7 days.' },
-  { id: 'DRI-2026-00408', name: 'Farooq A.', drGrade: 3, phc: 'PHC Hosakote', urgency: 'Urgent · 48h', urgencyType: 'urgent', referredOn: '2 days ago', status: 'Sent', aiConfidence: '93%', doctorStance: 'Confirmed by Dr. Arjun Sharma', handoffNotes: 'Cotton wool spots with IRMA. Referral letter sent.' },
-  { id: 'DRI-2026-00412', name: 'Lakshmi D.', drGrade: 2, phc: 'PHC Chelur', urgency: 'High · 7 Days', urgencyType: 'high', referredOn: '5 days ago', status: 'Attended', aiConfidence: '88%', doctorStance: 'Confirmed by Dr. Arjun Sharma', handoffNotes: 'Patient checked into District Hospital Retina OPD.' },
-  { id: 'DRI-2026-00415', name: 'Savithri M.', drGrade: 1, phc: 'PHC Hosakote', urgency: 'Routine', urgencyType: 'routine', referredOn: '8 days ago', status: 'Attended', aiConfidence: '96%', doctorStance: 'Confirmed by Dr. Arjun Sharma', handoffNotes: 'Routine PHC follow-up completed.' },
-  { id: 'DRI-2026-00401', name: 'Govindappa N.', drGrade: 3, phc: 'PHC Chintamani', urgency: 'Urgent · 48h', urgencyType: 'urgent', referredOn: '9 days ago', status: 'Attended', aiConfidence: '92%', doctorStance: 'Confirmed by Dr. Arjun Sharma', handoffNotes: 'PRP laser therapy planned.' },
-  { id: 'DRI-2026-00398', name: 'Muniyappa K.', drGrade: 2, phc: 'PHC Hosakote', urgency: 'High · 7 Days', urgencyType: 'high', referredOn: '12 days ago', status: 'No Show', aiConfidence: '90%', doctorStance: 'Confirmed by Dr. Arjun Sharma', handoffNotes: 'Patient missed appointment. Home visit dispatched.' },
-]
-
-const MOCK_STATS = { total: 68, attendance_rate: 78, avg_days: 5.6, open: 14 }
 
 export default function Referrals() {
   const navigate = useNavigate()
@@ -30,8 +18,8 @@ export default function Referrals() {
   const [phcFilter, setPhcFilter] = useState('all')
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [showExportToast, setShowExportToast] = useState(false)
-  const [referralsData, setReferralsData] = useState(MOCK_REFERRALS)
-  const [statsData, setStatsData] = useState(MOCK_STATS)
+  const [referralsData, setReferralsData] = useState([])
+  const [statsData, setStatsData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState(null)
 
@@ -63,11 +51,12 @@ export default function Referrals() {
 
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           const s = statsRes.value
+          const total = s.total ?? 0
           setStatsData({
-            total: s.total ?? 68,
-            attendance_rate: s.attendance_rate ?? 78,
-            avg_days: s.avg_days ?? 5.6,
-            open: s.pending ?? 14,
+            total,
+            attendance_rate: s.attendance_rate ?? (total > 0 ? Math.round(((s.attended ?? 0) / total) * 100) : 0),
+            avg_days: s.avg_days ?? 0,
+            open: s.pending ?? 0,
           })
         }
       } catch (err) {
@@ -174,22 +163,22 @@ export default function Referrals() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] border border-[#E2E7E3] border-l-4 border-l-[#285943] flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2"><span className="text-xs font-semibold uppercase tracking-wider text-[#66756D]">Total Referrals (Month)</span><Users className="w-4 h-4 text-[#285943]" /></div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-[#285943] tracking-tight font-heading mb-1.5">{loading ? '...' : statsData.total}</div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-[#285943] tracking-tight font-heading mb-1.5">{loading ? <Skeleton className="h-9 w-14" /> : statsData?.total ?? 0}</div>
             <div className="flex items-center gap-1 text-xs text-[#66756D]"><span className="text-[#047857] font-semibold inline-flex items-center text-xs"><TrendingUp className="w-3.5 h-3.5 mr-0.5" />+12%</span><span>from last month</span></div>
           </div>
           <div className="bg-white rounded-xl p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] border border-[#E2E7E3] border-l-4 border-l-[#16866A] flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2"><span className="text-xs font-semibold uppercase tracking-wider text-[#66756D]">Attendance Rate</span><CheckCircle2 className="w-4 h-4 text-[#16866A]" /></div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-[#16866A] tracking-tight font-heading mb-1.5">{loading ? '...' : `${statsData.attendance_rate}%`}</div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-[#16866A] tracking-tight font-heading mb-1.5">{loading ? <Skeleton className="h-9 w-14" /> : `${statsData?.attendance_rate ?? 0}%`}</div>
             <div className="flex items-center gap-1.5 text-xs text-[#66756D]"><span className="px-1.5 py-0.5 rounded bg-[#E6F4EA] text-[#047857] font-semibold text-[11px] border border-[#047857]/20">Target ≥75%</span></div>
           </div>
           <div className="bg-white rounded-xl p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] border border-[#E2E7E3] border-l-4 border-l-[#64748B] flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2"><span className="text-xs font-semibold uppercase tracking-wider text-[#66756D]">Avg Days to Attendance</span><Clock className="w-4 h-4 text-[#64748B]" /></div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-[#64748B] tracking-tight font-heading mb-1.5">{loading ? '...' : statsData.avg_days} <span className="text-sm font-normal text-[#66756D]">days</span></div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-[#64748B] tracking-tight font-heading mb-1.5">{loading ? <Skeleton className="h-9 w-14" /> : <>{statsData?.avg_days ?? 0} <span className="text-sm font-normal text-[#66756D]">days</span></>}</div>
             <div className="flex items-center gap-1 text-xs text-[#66756D]"><Clock className="w-3.5 h-3.5 text-[#047857]" /><span>Within 7-day protocol</span></div>
           </div>
           <div className="bg-white rounded-xl p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] border border-[#E2E7E3] border-l-4 border-l-[#DC2626] flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2"><span className="text-xs font-semibold uppercase tracking-wider text-[#66756D]">Open / Pending</span><AlertTriangle className="w-4 h-4 text-[#DC2626]" /></div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-[#DC2626] tracking-tight font-heading mb-1.5">{loading ? '...' : statsData.open}</div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-[#DC2626] tracking-tight font-heading mb-1.5">{loading ? <Skeleton className="h-9 w-14" /> : statsData?.open ?? 0}</div>
             <div className="flex items-center gap-1 text-xs text-[#DC2626] font-medium"><AlertTriangle className="w-3.5 h-3.5" /><span>4 require urgent transport</span></div>
           </div>
         </div>
@@ -258,7 +247,19 @@ export default function Referrals() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredReferrals.length > 0 ? filteredReferrals.map(row => (
+                {loading ? (
+                  [0, 1, 2, 3, 4].map(i => (
+                    <tr key={i}>
+                      <td className="py-3 px-4"><Skeleton className="h-4 w-28 mb-1.5" /><Skeleton className="h-3 w-20" /></td>
+                      <td className="py-3 px-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="py-3 px-3"><Skeleton className="h-3 w-24" /></td>
+                      <td className="py-3 px-3"><Skeleton className="h-4 w-20" /></td>
+                      <td className="py-3 px-3"><Skeleton className="h-3 w-16" /></td>
+                      <td className="py-3 px-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="py-3 px-4 text-right"><Skeleton className="h-6 w-20 ml-auto" /></td>
+                    </tr>
+                  ))
+                ) : filteredReferrals.length > 0 ? filteredReferrals.map(row => (
                   <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4"><div className="font-bold text-[#20312A]">{row.name}</div><div className="text-xs text-[#66756D] font-mono">{row.id}</div></td>
                     <td className="py-3 px-3"><GradeBadge grade={row.drGrade} /></td>

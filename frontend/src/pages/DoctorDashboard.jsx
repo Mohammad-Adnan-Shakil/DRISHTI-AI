@@ -3,16 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Eye, Calendar, AlertTriangle, CheckCircle2, Users, Clock, ArrowRight, ShieldCheck } from 'lucide-react'
 import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
+import Skeleton from '../components/Skeleton'
 import { getPendingScreenings, getScreeningStats } from '../lib/api'
-
-const MOCK_QUEUE = [
-  { id: 'DRI-2026-00419', name: 'Ravi T.', phc: 'PHC Chelur', drGrade: 4, confidence: '91%', time: '7:55 AM', urgency: 'Critical', railColor: 'border-l-[#991B1B]' },
-  { id: 'DRI-2026-00411', name: 'Mahesh K.', phc: 'PHC Hosakote', drGrade: 3, confidence: '93%', time: '8:42 AM', urgency: 'Urgent', railColor: 'border-l-[#DC2626]' },
-  { id: 'DRI-2026-00408', name: 'Farooq A.', phc: 'PHC Hosakote', drGrade: 3, confidence: '92%', time: '11:05 AM', urgency: 'Urgent', railColor: 'border-l-[#DC2626]' },
-  { id: 'DRI-2026-00421', name: 'Anitha R.', phc: 'PHC Hosakote', drGrade: 2, confidence: '94%', time: '10:32 AM', urgency: 'High', railColor: 'border-l-[#EA580C]' },
-  { id: 'DRI-2026-00412', name: 'Lakshmi D.', phc: 'PHC Chelur', drGrade: 2, confidence: '89%', time: '9:20 AM', urgency: 'High', railColor: 'border-l-[#EA580C]' },
-  { id: 'DRI-2026-00415', name: 'Savithri M.', phc: 'PHC Hosakote', drGrade: 1, confidence: '91%', time: '9:15 AM', urgency: 'Routine', railColor: 'border-l-[#94A3B8]' },
-]
 
 function getRailColor(grade) {
   if (grade >= 4) return 'border-l-[#991B1B]'
@@ -70,8 +62,8 @@ function dedupeByPatientAndTime(records) {
 export default function DoctorDashboard() {
   const navigate = useNavigate()
   const [filterSeverity, setFilterSeverity] = useState('all')
-  const [queueData, setQueueData] = useState(MOCK_QUEUE)
-  const [stats, setStats] = useState({ pending: 14, reviewed: 32, confirmed: 26 })
+  const [queueData, setQueueData] = useState([])
+  const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -100,9 +92,9 @@ export default function DoctorDashboard() {
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           const s = statsRes.value
           setStats({
-            pending: s.pending_reviews ?? s.total_screenings ?? 14,
-            reviewed: s.reviewed_today ?? 32,
-            confirmed: s.referrals_confirmed ?? 26,
+            pending: s.pending_reviews ?? s.total_screenings ?? 0,
+            reviewed: s.reviewed_today ?? 0,
+            confirmed: s.referrals_confirmed ?? 0,
           })
         }
       } catch (err) {
@@ -163,7 +155,7 @@ export default function DoctorDashboard() {
                 <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 flex items-center justify-center text-[#DC2626]"><AlertTriangle className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#DC2626] tracking-tight">{loading ? '...' : stats.pending}</div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#DC2626] tracking-tight">{loading ? <Skeleton className="h-9 w-10" /> : stats?.pending ?? 0}</div>
                 <div className="flex items-center gap-1 text-[11px] text-rose-600 font-semibold mt-1"><span>● 3 urgent (Grade 3/4)</span></div>
               </div>
             </div>
@@ -173,7 +165,7 @@ export default function DoctorDashboard() {
                 <div className="w-8 h-8 rounded-lg bg-[#E6F4EA] border border-[#16866A]/20 flex items-center justify-center text-[#16866A]"><CheckCircle2 className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#16866A] tracking-tight">{loading ? '...' : stats.reviewed}</div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#16866A] tracking-tight">{loading ? <Skeleton className="h-9 w-10" /> : stats?.reviewed ?? 0}</div>
                 <div className="flex items-center gap-1 text-[11px] text-[#047857] font-semibold mt-1"><span>↑ 8 cases from yesterday</span></div>
               </div>
             </div>
@@ -183,7 +175,7 @@ export default function DoctorDashboard() {
                 <div className="w-8 h-8 rounded-lg bg-[#E6F4EA] border border-[#285943]/20 flex items-center justify-center text-[#285943]"><Users className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#285943] tracking-tight">{loading ? '...' : stats.confirmed}</div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#285943] tracking-tight">{loading ? <Skeleton className="h-9 w-10" /> : stats?.confirmed ?? 0}</div>
                 <div className="flex items-center gap-1 text-[11px] text-[#285943] font-semibold mt-1"><span>81.2% confirmation rate</span></div>
               </div>
             </div>
@@ -249,46 +241,70 @@ export default function DoctorDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E7E3] text-sm bg-white">
-                {filteredQueue.map((item) => (
-                  <tr key={item.id} className={`hover:bg-[#F8FAF7]/80 transition-colors border-l-[4px] ${item.railColor}`}>
-                    <td className="py-3.5 pl-4 pr-3">
-                      <div className="font-bold text-[#20312A]">{item.name}</div>
-                      <div className="text-xs text-[#66756D] font-mono">{item.id}</div>
-                    </td>
-                    <td className="py-3.5 px-3 text-xs text-[#20312A] font-medium">{item.phc}</td>
-                    <td className="py-3.5 px-3"><GradeBadge grade={item.drGrade} /></td>
-                    <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-semibold text-[#20312A] min-w-[32px]">{item.confidence}</span>
-                        <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden shrink-0">
-                          <div className={`h-full rounded-full ${parseInt(item.confidence) > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]'}`} style={{ width: item.confidence }} />
+                {loading ? (
+                  [0, 1, 2, 3, 4].map(i => (
+                    <tr key={i}>
+                      <td className="py-3.5 pl-4 pr-3"><Skeleton className="h-4 w-28 mb-1.5" /><Skeleton className="h-3 w-20" /></td>
+                      <td className="py-3.5 px-3"><Skeleton className="h-3 w-24" /></td>
+                      <td className="py-3.5 px-3"><Skeleton className="h-5 w-16" /></td>
+                      <td className="py-3.5 px-3"><Skeleton className="h-4 w-16" /></td>
+                      <td className="py-3.5 px-3"><Skeleton className="h-3 w-14" /></td>
+                      <td className="py-3.5 px-3"><Skeleton className="h-4 w-16" /></td>
+                      <td className="py-3.5 pl-3 pr-5 text-right"><Skeleton className="h-6 w-16 ml-auto" /></td>
+                    </tr>
+                  ))
+                ) : (
+                  filteredQueue.map((item) => (
+                    <tr key={item.id} className={`hover:bg-[#F8FAF7]/80 transition-colors border-l-[4px] ${item.railColor}`}>
+                      <td className="py-3.5 pl-4 pr-3">
+                        <div className="font-bold text-[#20312A]">{item.name}</div>
+                        <div className="text-xs text-[#66756D] font-mono">{item.id}</div>
+                      </td>
+                      <td className="py-3.5 px-3 text-xs text-[#20312A] font-medium">{item.phc}</td>
+                      <td className="py-3.5 px-3"><GradeBadge grade={item.drGrade} /></td>
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-semibold text-[#20312A] min-w-[32px]">{item.confidence}</span>
+                          <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden shrink-0">
+                            <div className={`h-full rounded-full ${parseInt(item.confidence) > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]'}`} style={{ width: item.confidence }} />
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-3 text-xs text-[#20312A] font-medium">{item.time}</td>
-                    <td className="py-3.5 px-3">
-                      {item.urgency === 'Critical' || item.urgency === 'Urgent' ? (
-                        <span className="text-[#DC2626] font-bold text-xs uppercase flex items-center gap-1"><AlertTriangle size={14} className="shrink-0" /><span>{item.urgency}</span></span>
-                      ) : (
-                        <span className="text-[#475569] font-bold text-xs uppercase flex items-center gap-1"><Clock size={14} className="shrink-0" /><span>{item.urgency}</span></span>
-                      )}
-                    </td>
-                    <td className="py-3.5 pl-3 pr-5 text-right">
-                      <button type="button" onClick={() => navigate(`/doctor-review/${item.id}`)}
-                        className="bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 cursor-pointer text-xs">
-                        <span>Review</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-current" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3.5 px-3 text-xs text-[#20312A] font-medium">{item.time}</td>
+                      <td className="py-3.5 px-3">
+                        {item.urgency === 'Critical' || item.urgency === 'Urgent' ? (
+                          <span className="text-[#DC2626] font-bold text-xs uppercase flex items-center gap-1"><AlertTriangle size={14} className="shrink-0" /><span>{item.urgency}</span></span>
+                        ) : (
+                          <span className="text-[#475569] font-bold text-xs uppercase flex items-center gap-1"><Clock size={14} className="shrink-0" /><span>{item.urgency}</span></span>
+                        )}
+                      </td>
+                      <td className="py-3.5 pl-3 pr-5 text-right">
+                        <button type="button" onClick={() => navigate(`/doctor-review/${item.id}`)}
+                          className="bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 cursor-pointer text-xs">
+                          <span>Review</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-current" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
           {/* Mobile Cards */}
           <div className="block sm:hidden p-4 space-y-3 bg-[#F8FAF7]">
-            {filteredQueue.map((item) => (
+            {loading ? (
+              [0, 1, 2].map(i => (
+                <div key={i} className="bg-white rounded-lg p-4 border border-[#E2E7E3] shadow-[0_2px_12px_rgba(40,89,67,0.04)] space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-14" />
+                  </div>
+                  <Skeleton className="h-5 w-20" />
+                </div>
+              ))
+            ) : filteredQueue.map((item) => (
               <div key={item.id} className={`bg-white rounded-lg p-4 border border-[#E2E7E3] shadow-[0_2px_12px_rgba(40,89,67,0.04)] border-l-[4px] ${item.railColor} space-y-3`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>

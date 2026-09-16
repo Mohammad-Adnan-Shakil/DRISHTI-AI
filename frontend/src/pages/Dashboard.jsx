@@ -6,6 +6,7 @@ import OfflineBanner from '../components/OfflineBanner'
 import GradeBadge from '../components/GradeBadge'
 import StatusBadge from '../components/StatusBadge'
 import StatCard from '../components/StatCard'
+import Skeleton from '../components/Skeleton'
 import { cn } from '../lib/utils'
 import { getScreeningStats, getPendingScreenings } from '../lib/api'
 import { getQueueCount } from '../lib/db'
@@ -15,27 +16,6 @@ function getConfidenceBarColor(confidence) {
   if (confidence >= 70) return 'bg-[#F59E0B]'
   return 'bg-[#EF4444]'
 }
-
-// Fallback mock data if API unavailable
-const MOCK_SCREENINGS = [
-  { id: 'DRI-2026-00421', name: 'Anitha R.', time: '10:32 AM', eye: 'OD', grade: 2, confidence: 94, status: 'referral-created' },
-  { id: 'DRI-2026-00418', name: 'Ramesh B.', time: '9:48 AM', eye: 'OS', grade: 0, confidence: 97, status: 'screening-complete' },
-  { id: 'DRI-2026-00415', name: 'Savithri M.', time: '9:15 AM', eye: 'OD', grade: 1, confidence: 91, status: 'screening-complete' },
-  { id: 'DRI-2026-00411', name: 'Mahesh K.', time: '8:42 AM', eye: 'OS', grade: 3, confidence: 93, status: 'referral-created' },
-  { id: 'DRI-2026-00407', name: 'Lakshmi P.', time: '8:10 AM', eye: 'OD', grade: 0, confidence: 96, status: 'screening-complete' },
-]
-
-const MOCK_STATS = {
-  total_screenings: 12,
-  total_referrals: 3,
-  pending_sync: 5,
-  total_patients: 248,
-}
-
-const MOCK_NEEDS_ATTENTION = [
-  { id: 'DRI-2026-00411', name: 'Mahesh K.', time: '8:42 AM', eye: 'OS', grade: 3, confidence: 93, status: 'referral-created' },
-  { id: 'DRI-2026-00421', name: 'Anitha R.', time: '10:32 AM', eye: 'OD', grade: 2, confidence: 94, status: 'referral-created' },
-]
 
 // Card for a single patient in the "Needs Attention" section — styled red for
 // urgent (grade >= 3) referrals, amber for routine referral review.
@@ -90,9 +70,9 @@ export default function Dashboard() {
   const today = new Date()
   const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })
 
-  const [stats, setStats] = useState(MOCK_STATS)
-  const [recentScreenings, setRecentScreenings] = useState(MOCK_SCREENINGS)
-  const [needsAttention, setNeedsAttention] = useState(MOCK_NEEDS_ATTENTION)
+  const [stats, setStats] = useState(null)
+  const [recentScreenings, setRecentScreenings] = useState([])
+  const [needsAttention, setNeedsAttention] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -105,12 +85,12 @@ export default function Dashboard() {
         ])
 
         setStats(prev => {
-          const next = { ...prev }
+          const next = { total_screenings: 0, total_referrals: 0, pending_sync: 0, total_patients: 0, ...prev }
           if (statsData.status === 'fulfilled' && statsData.value) {
             const s = statsData.value
-            next.total_screenings = s.total_screenings ?? prev.total_screenings
-            next.total_referrals = s.referrals_recommended ?? prev.total_referrals
-            next.total_patients = s.total_patients ?? prev.total_patients
+            next.total_screenings = s.total_screenings ?? next.total_screenings
+            next.total_referrals = s.referrals_recommended ?? next.total_referrals
+            next.total_patients = s.total_patients ?? next.total_patients
           }
           // Pending Sync comes from the local offline queue (IndexedDB), not
           // the backend — it works even when the backend is unreachable.
@@ -222,12 +202,12 @@ export default function Dashboard() {
         {/* STAT CARDS */}
         <section aria-label="Clinical Metrics Overview">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            <StatCard title="Today's Screenings" value={loading ? '...' : String(stats.total_screenings)} subtitle="Completed at PHC Hosakote" icon={Eye} accentColor="teal" />
-            <StatCard title="Referrals Today" value={loading ? '...' : String(stats.total_referrals)} subtitle="Sent to District Eye Hospital" icon={Send} accentColor="amber" href="/referrals">
+            <StatCard title="Today's Screenings" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_screenings ?? 0)} subtitle="Completed at PHC Hosakote" icon={Eye} accentColor="teal" />
+            <StatCard title="Referrals Today" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_referrals ?? 0)} subtitle="Sent to District Eye Hospital" icon={Send} accentColor="amber" href="/referrals">
               <span className="text-xs font-semibold text-[#B45309] bg-amber-50 px-2 py-0.5 rounded-full border border-[#F59E0B]/30">Requires follow-up</span>
             </StatCard>
-            <StatCard title="Pending Sync" value={loading ? '...' : String(stats.pending_sync)} subtitle="Screenings waiting to sync" icon={Users} accentColor="slate" />
-            <StatCard title="Total Patients" value={loading ? '...' : String(stats.total_patients)} subtitle="Registered at PHC Hosakote" icon={Users} accentColor="forest" />
+            <StatCard title="Pending Sync" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.pending_sync ?? 0)} subtitle="Screenings waiting to sync" icon={Users} accentColor="slate" />
+            <StatCard title="Total Patients" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_patients ?? 0)} subtitle="Registered at PHC Hosakote" icon={Users} accentColor="forest" />
           </div>
         </section>
 
@@ -241,10 +221,25 @@ export default function Dashboard() {
               </div>
               <p className="text-xs sm:text-sm text-[#475569]">Patients requiring follow-up</p>
             </div>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-[#EF4444] border border-[#EF4444]/25">{needsAttention.length} action item{needsAttention.length === 1 ? '' : 's'}</span>
+            {!loading && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-[#EF4444] border border-[#EF4444]/25">{needsAttention.length} action item{needsAttention.length === 1 ? '' : 's'}</span>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {needsAttention.map(item => <NeedsAttentionCard key={item.id} item={item} />)}
+            {loading ? (
+              [0, 1].map(i => (
+                <div key={i} className="border border-[#E2E7E3] rounded-2xl p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-14" />
+                  </div>
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-4 w-full" />
+                </div>
+              ))
+            ) : (
+              needsAttention.map(item => <NeedsAttentionCard key={item.id} item={item} />)
+            )}
           </div>
         </section>
 
@@ -283,40 +278,65 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E7E3] text-sm">
-                {recentScreenings.map((s) => (
-                  <tr key={s.id} className="hover:bg-[#F8FAF7] transition-colors group cursor-pointer h-16">
-                    <td className="py-4 px-6">
-                      <div className="font-semibold text-[#20312A] text-sm">{s.name}</div>
-                      <div className="text-xs text-[#475569] font-mono">{s.id}</div>
-                    </td>
-                    <td className="py-4 px-4 text-xs text-[#475569] whitespace-nowrap">{s.time}</td>
-                    <td className="py-4 px-4">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#F8FAF7] text-[#20312A] border border-[#E2E7E3]">{s.eye}</span>
-                    </td>
-                    <td className="py-4 px-5"><GradeBadge grade={s.grade} /></td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[#20312A] font-mono min-w-[32px]">{s.confidence}%</span>
-                        <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden shrink-0">
-                          <div className={cn('h-full rounded-full transition-all duration-300', s.confidence > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]')} style={{ width: `${s.confidence}%` }} />
+                {loading ? (
+                  [0, 1, 2, 3, 4].map(i => (
+                    <tr key={i} className="h-16">
+                      <td className="py-4 px-6"><Skeleton className="h-4 w-32 mb-1.5" /><Skeleton className="h-3 w-20" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-3 w-14" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-5 w-10" /></td>
+                      <td className="py-4 px-5"><Skeleton className="h-5 w-16" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-4 w-16" /></td>
+                      <td className="py-4 px-5"><Skeleton className="h-5 w-20" /></td>
+                      <td className="py-4 px-6 text-right"><Skeleton className="h-6 w-12 ml-auto" /></td>
+                    </tr>
+                  ))
+                ) : (
+                  recentScreenings.map((s) => (
+                    <tr key={s.id} className="hover:bg-[#F8FAF7] transition-colors group cursor-pointer h-16">
+                      <td className="py-4 px-6">
+                        <div className="font-semibold text-[#20312A] text-sm">{s.name}</div>
+                        <div className="text-xs text-[#475569] font-mono">{s.id}</div>
+                      </td>
+                      <td className="py-4 px-4 text-xs text-[#475569] whitespace-nowrap">{s.time}</td>
+                      <td className="py-4 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#F8FAF7] text-[#20312A] border border-[#E2E7E3]">{s.eye}</span>
+                      </td>
+                      <td className="py-4 px-5"><GradeBadge grade={s.grade} /></td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[#20312A] font-mono min-w-[32px]">{s.confidence}%</span>
+                          <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden shrink-0">
+                            <div className={cn('h-full rounded-full transition-all duration-300', s.confidence > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]')} style={{ width: `${s.confidence}%` }} />
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-5"><StatusBadge status={s.status} /></td>
-                    <td className="py-4 px-6 text-right">
-                      <Link to={`/doctor-review/${s.id}`} className="inline-flex items-center justify-center px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] border border-transparent hover:border-[#E2E7E3] transition-colors cursor-pointer">
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-4 px-5"><StatusBadge status={s.status} /></td>
+                      <td className="py-4 px-6 text-right">
+                        <Link to={`/doctor-review/${s.id}`} className="inline-flex items-center justify-center px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] border border-transparent hover:border-[#E2E7E3] transition-colors cursor-pointer">
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
           {/* Mobile Cards */}
           <div className="md:hidden space-y-3">
-            {recentScreenings.map((s) => (
+            {loading ? (
+              [0, 1, 2].map(i => (
+                <div key={i} className="bg-white rounded-2xl border border-[#E2E7E3] p-4 shadow-[0_2px_12px_rgba(40,89,67,0.04)] space-y-3">
+                  <div className="flex items-start justify-between">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-14" />
+                  </div>
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              ))
+            ) : recentScreenings.map((s) => (
               <Link key={s.id} to={`/doctor-review/${s.id}`} className="bg-white rounded-2xl border border-[#E2E7E3] p-4 shadow-[0_2px_12px_rgba(40,89,67,0.04)] space-y-3 block text-inherit no-underline hover:border-[#16866A] transition-colors">
                 <div className="flex items-start justify-between">
                   <div>
