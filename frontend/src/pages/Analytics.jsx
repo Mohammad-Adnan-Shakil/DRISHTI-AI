@@ -5,33 +5,16 @@ import {
   Sparkles, ArrowRight, AlertCircle, Building2, Globe, Activity
 } from 'lucide-react'
 import AdminNavbar from '../components/AdminNavbar'
+import Skeleton from '../components/Skeleton'
 import { getScreeningStats, getReferralStats } from '../lib/api'
 import { exportAnalyticsToCSV } from '../lib/csvExport'
-
-const MOCK_STATS = {
-  total_screenings: 1248,
-  referable_cases: 186,
-  attendance_rate: 78,
-  active_phcs: 24,
-  pending_reviews: 14,
-  reviewed_30d: 412,
-  median_review_time: '4h 12m',
-  ai_agreement_rate: 81,
-}
-
-const MOCK_REFERRAL_STATS = {
-  total: 68,
-  pending: 14,
-  attended: 110,
-  no_show: 32,
-}
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState('30')
   const [showExportToast, setShowExportToast] = useState(false)
   const [activeSection, setActiveSection] = useState('overview')
-  const [stats, setStats] = useState(MOCK_STATS)
-  const [refStats, setRefStats] = useState(MOCK_REFERRAL_STATS)
+  const [stats, setStats] = useState(null)
+  const [refStats, setRefStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -44,20 +27,22 @@ export default function Analytics() {
         if (sRes.status === 'fulfilled' && sRes.value) {
           const s = sRes.value
           setStats(prev => ({
-            ...prev,
-            total_screenings: s.total_screenings ?? prev.total_screenings,
-            referable_cases: s.referable_cases ?? prev.referable_cases,
-            pending_reviews: s.pending_reviews ?? prev.pending_reviews,
-            reviewed_30d: s.reviewed_30d ?? prev.reviewed_30d,
+            total_screenings: s.total_screenings ?? prev?.total_screenings ?? 0,
+            referable_cases: s.referable_cases ?? prev?.referable_cases ?? 0,
+            active_phcs: s.active_phcs ?? prev?.active_phcs ?? 0,
+            pending_reviews: s.pending_reviews ?? prev?.pending_reviews ?? 0,
+            reviewed_30d: s.reviewed_30d ?? prev?.reviewed_30d ?? 0,
+            median_review_time: s.median_review_time ?? prev?.median_review_time ?? '—',
+            ai_agreement_rate: s.ai_agreement_rate ?? prev?.ai_agreement_rate ?? 0,
           }))
         }
         if (rRes.status === 'fulfilled' && rRes.value) {
           const r = rRes.value
           setRefStats({
-            total: r.total ?? 68,
-            pending: r.pending ?? 14,
-            attended: r.attended ?? 110,
-            no_show: r.no_show ?? 32,
+            total: r.total ?? 0,
+            pending: r.pending ?? 0,
+            attended: r.attended ?? 0,
+            no_show: r.no_show ?? 0,
           })
         }
       } catch (err) {
@@ -69,7 +54,12 @@ export default function Analytics() {
     fetchData()
   }, [])
 
-  const attendanceRate = refStats.total > 0 ? Math.round((refStats.attended / refStats.total) * 100) : stats.attendance_rate
+  // Safe-access views — stats/refStats stay null until the fetch settles
+  // (or forever, if it fails entirely), so every read below goes through
+  // these rather than risking a null-dereference crash.
+  const safeStats = stats ?? {}
+  const safeRefStats = refStats ?? {}
+  const attendanceRate = safeRefStats.total > 0 ? Math.round((safeRefStats.attended / safeRefStats.total) * 100) : (safeStats.attendance_rate ?? 0)
 
   const phcPerformance = [
     { name: 'PHC Hosakote', workers: 6, screenings: 412, referrals: 64, attendance: '82%', attendanceLevel: 'High', confidence: 84, status: 'Online' },
@@ -112,17 +102,17 @@ export default function Analytics() {
 
   const handleExportAnalyticsCsv = () => {
     const kpiData = {
-      'Total Screenings': stats.total_screenings,
-      'Referable Cases (Grade >= 2)': stats.referable_cases,
+      'Total Screenings': safeStats.total_screenings ?? 0,
+      'Referable Cases (Grade >= 2)': safeStats.referable_cases ?? 0,
       'Referral Attendance Rate (%)': attendanceRate,
-      'Active PHCs': stats.active_phcs,
-      'Pending Reviews': stats.pending_reviews,
-      'Reviewed (30 Days)': stats.reviewed_30d,
-      'Median Time to Review': stats.median_review_time,
-      'AI Agreement Rate (%)': stats.ai_agreement_rate,
-      'Total Referrals': refStats.total,
-      'Referrals Attended': refStats.attended,
-      'Referrals No-Show': refStats.no_show,
+      'Active PHCs': safeStats.active_phcs ?? 0,
+      'Pending Reviews': safeStats.pending_reviews ?? 0,
+      'Reviewed (30 Days)': safeStats.reviewed_30d ?? 0,
+      'Median Time to Review': safeStats.median_review_time ?? '—',
+      'AI Agreement Rate (%)': safeStats.ai_agreement_rate ?? 0,
+      'Total Referrals': safeRefStats.total ?? 0,
+      'Referrals Attended': safeRefStats.attended ?? 0,
+      'Referrals No-Show': safeRefStats.no_show ?? 0,
     }
     exportAnalyticsToCSV(dateRange, kpiData, phcPerformance)
     setShowExportToast(true)
@@ -192,10 +182,10 @@ export default function Analytics() {
           <section aria-label="Key Performance Indicators">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Total Screenings', value: loading ? '...' : stats.total_screenings.toLocaleString(), sub: `Last ${dateRange} days`, trend: '+12.4%', color: 'border-l-[#285943]', icon: <Activity className="w-4 h-4 text-[#285943]" />, bg: 'bg-emerald-50', textColor: 'text-[#285943]' },
-                { label: 'Referable Cases', value: loading ? '...' : stats.referable_cases, sub: 'Grade ≥ 2', trend: '14.9% of total', color: 'border-l-[#D97706]', icon: <AlertTriangle className="w-4 h-4 text-[#D97706]" />, bg: 'bg-amber-50', textColor: 'text-[#20312A]' },
-                { label: 'Referral Attendance', value: loading ? '...' : `${attendanceRate}%`, sub: `${refStats.attended} / ${refStats.total + refStats.pending} attended`, trend: 'Target: 85%', color: 'border-l-[#0D9488]', icon: <CheckCircle2 className="w-4 h-4 text-[#0D9488]" />, bg: 'bg-teal-50', textColor: 'text-[#20312A]' },
-                { label: 'Active PHCs', value: loading ? '...' : stats.active_phcs, sub: 'Rural network centres', trend: 'All Online', color: 'border-l-[#285943]', icon: <Building2 className="w-4 h-4 text-[#285943]" />, bg: 'bg-emerald-50', textColor: 'text-[#20312A]' },
+                { label: 'Total Screenings', value: loading ? <Skeleton className="h-9 w-16" /> : (safeStats.total_screenings ?? 0).toLocaleString(), sub: `Last ${dateRange} days`, trend: '+12.4%', color: 'border-l-[#285943]', icon: <Activity className="w-4 h-4 text-[#285943]" />, bg: 'bg-emerald-50', textColor: 'text-[#285943]' },
+                { label: 'Referable Cases', value: loading ? <Skeleton className="h-9 w-16" /> : (safeStats.referable_cases ?? 0), sub: 'Grade ≥ 2', trend: '14.9% of total', color: 'border-l-[#D97706]', icon: <AlertTriangle className="w-4 h-4 text-[#D97706]" />, bg: 'bg-amber-50', textColor: 'text-[#20312A]' },
+                { label: 'Referral Attendance', value: loading ? <Skeleton className="h-9 w-16" /> : `${attendanceRate}%`, sub: `${safeRefStats.attended ?? 0} / ${(safeRefStats.total ?? 0) + (safeRefStats.pending ?? 0)} attended`, trend: 'Target: 85%', color: 'border-l-[#0D9488]', icon: <CheckCircle2 className="w-4 h-4 text-[#0D9488]" />, bg: 'bg-teal-50', textColor: 'text-[#20312A]' },
+                { label: 'Active PHCs', value: loading ? <Skeleton className="h-9 w-16" /> : (safeStats.active_phcs ?? 0), sub: 'Rural network centres', trend: 'All Online', color: 'border-l-[#285943]', icon: <Building2 className="w-4 h-4 text-[#285943]" />, bg: 'bg-emerald-50', textColor: 'text-[#20312A]' },
               ].map(card => (
                 <div key={card.label} className={`bg-white rounded-xl border border-[#E2E7E3] border-l-4 ${card.color} shadow-[0_2px_12px_rgba(40,89,67,0.04)] p-4 sm:p-5 flex flex-col justify-between`}>
                   <div>
@@ -224,10 +214,10 @@ export default function Analytics() {
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Pending Reviews', value: loading ? '...' : stats.pending_reviews, sub: 'Awaiting confirmation', link: '/doctor-dashboard', color: 'border-l-[#DC2626]', textColor: 'text-[#20312A]' },
-                { label: 'Reviewed (30 days)', value: loading ? '...' : stats.reviewed_30d, sub: 'Completed clinical reviews', color: 'border-l-[#0D9488]', textColor: 'text-[#20312A]' },
-                { label: 'Median Time to Review', value: stats.median_review_time, sub: 'Target: < 24h', color: 'border-l-[#285943]', textColor: 'text-[#20312A]' },
-                { label: 'AI Agreement Rate', value: `${stats.ai_agreement_rate}%`, sub: 'Doctor accepted AI grade', color: 'border-l-[#0D9488]', textColor: 'text-[#20312A]' },
+                { label: 'Pending Reviews', value: loading ? <Skeleton className="h-8 w-10" /> : (safeStats.pending_reviews ?? 0), sub: 'Awaiting confirmation', link: '/doctor-dashboard', color: 'border-l-[#DC2626]', textColor: 'text-[#20312A]' },
+                { label: 'Reviewed (30 days)', value: loading ? <Skeleton className="h-8 w-10" /> : (safeStats.reviewed_30d ?? 0), sub: 'Completed clinical reviews', color: 'border-l-[#0D9488]', textColor: 'text-[#20312A]' },
+                { label: 'Median Time to Review', value: loading ? <Skeleton className="h-8 w-16" /> : (safeStats.median_review_time ?? '—'), sub: 'Target: < 24h', color: 'border-l-[#285943]', textColor: 'text-[#20312A]' },
+                { label: 'AI Agreement Rate', value: loading ? <Skeleton className="h-8 w-12" /> : `${safeStats.ai_agreement_rate ?? 0}%`, sub: 'Doctor accepted AI grade', color: 'border-l-[#0D9488]', textColor: 'text-[#20312A]' },
               ].map(card => (
                 <div key={card.label} className={`bg-white rounded-xl border border-[#E2E7E3] border-l-4 ${card.color} shadow-xs hover:shadow-sm transition-shadow p-4 sm:p-5 flex flex-col justify-between`}>
                   <div>
@@ -245,17 +235,12 @@ export default function Analytics() {
 
           {/* Referral SLA Alerts */}
           <section className="bg-white rounded-xl border border-[#E2E7E3] p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col space-y-4 mt-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-              <div>
-                <h2 className="text-base font-bold text-[#20312A] tracking-tight font-heading">Referral SLA Alerts</h2>
-                <p className="text-xs text-[#66756D] mt-0.5">Cases needing operational attention</p>
-              </div>
-              <Link to="/referrals" className="inline-flex items-center text-xs font-semibold text-[#16866A] hover:text-[#285943] transition-colors">
-                <span>All Active Referrals</span><ArrowRight className="w-3.5 h-3.5 ml-1" />
-              </Link>
+            <div>
+              <h2 className="text-base font-bold text-[#20312A] tracking-tight font-heading">Referral SLA Alerts</h2>
+              <p className="text-xs text-[#66756D] mt-0.5">Cases needing operational attention</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Link to="/referrals" className="group block p-4 sm:p-5 rounded-xl bg-[#FEF2F2] border border-red-200 border-l-4 border-l-[#DC2626] hover:shadow-[0_2px_12px_rgba(40,89,67,0.08)] transition-all">
+              <div className="p-4 sm:p-5 rounded-xl bg-[#FEF2F2] border border-red-200 border-l-4 border-l-[#DC2626]">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="text-xs font-bold text-[#DC2626] uppercase tracking-wider">Critical pending &gt; 24h</div>
@@ -264,11 +249,8 @@ export default function Analytics() {
                   </div>
                   <span className="p-1.5 rounded-md bg-white text-[#DC2626] shadow-xs border border-red-100"><AlertTriangle className="w-4 h-4" /></span>
                 </div>
-                <div className="mt-3 pt-2 border-t border-red-200/60 flex items-center justify-between text-xs font-semibold text-[#DC2626] group-hover:underline">
-                  <span>View in Referrals</span><span>→</span>
-                </div>
-              </Link>
-              <Link to="/referrals" className="group block p-4 sm:p-5 rounded-xl bg-[#FFFBEB] border border-amber-200 border-l-4 border-l-[#D97706] hover:shadow-[0_2px_12px_rgba(40,89,67,0.08)] transition-all">
+              </div>
+              <div className="p-4 sm:p-5 rounded-xl bg-[#FFFBEB] border border-amber-200 border-l-4 border-l-[#D97706]">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="text-xs font-bold text-amber-900 uppercase tracking-wider">Urgent pending &gt; 48h</div>
@@ -277,23 +259,17 @@ export default function Analytics() {
                   </div>
                   <span className="p-1.5 rounded-md bg-white text-amber-800 shadow-xs border border-amber-100"><Clock className="w-4 h-4" /></span>
                 </div>
-                <div className="mt-3 pt-2 border-t border-amber-200/60 flex items-center justify-between text-xs font-semibold text-amber-900 group-hover:underline">
-                  <span>View in Referrals</span><span>→</span>
-                </div>
-              </Link>
-              <Link to="/referrals" className="group block p-4 sm:p-5 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] border-l-4 border-l-[#64748B] hover:shadow-[0_2px_12px_rgba(40,89,67,0.08)] transition-all">
+              </div>
+              <div className="p-4 sm:p-5 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] border-l-4 border-l-[#64748B]">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="text-xs font-bold text-[#20312A] uppercase tracking-wider">No-show rate (30d)</div>
-                    <div className="text-2xl font-extrabold text-[#20312A] font-heading">{loading ? '...' : `${Math.round((refStats.no_show / Math.max(refStats.total, 1)) * 100)}%`}</div>
-                    <p className="text-xs text-[#66756D]">{refStats.no_show} no-shows · outreach recommended</p>
+                    <div className="text-2xl font-extrabold text-[#20312A] font-heading">{loading ? <Skeleton className="h-8 w-12" /> : `${Math.round(((safeRefStats.no_show ?? 0) / Math.max(safeRefStats.total ?? 0, 1)) * 100)}%`}</div>
+                    <p className="text-xs text-[#66756D]">{safeRefStats.no_show ?? 0} no-shows · outreach recommended</p>
                   </div>
                   <span className="p-1.5 rounded-md bg-white text-slate-700 shadow-xs border border-slate-200"><AlertCircle className="w-4 h-4" /></span>
                 </div>
-                <div className="mt-3 pt-2 border-t border-[#E2E7E3] flex items-center justify-between text-xs font-semibold text-[#20312A] group-hover:underline">
-                  <span>View in Referrals</span><span>→</span>
-                </div>
-              </Link>
+              </div>
             </div>
           </section>
         </div>
@@ -344,7 +320,7 @@ export default function Analytics() {
             <section className="lg:col-span-5 bg-white rounded-xl border border-[#E2E7E3] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between overflow-hidden">
               <div className="px-5 py-4 border-b border-[#E2E7E3]">
                 <h2 className="text-base font-bold text-[#20312A] tracking-tight font-heading">DR Grade Distribution</h2>
-                <p className="text-xs text-[#66756D] mt-0.5">Proportion across {loading ? '...' : stats.total_screenings.toLocaleString()} completed patient visits</p>
+                <p className="text-xs text-[#66756D] mt-0.5">Proportion across {loading ? '...' : (safeStats.total_screenings ?? 0).toLocaleString()} completed patient visits</p>
               </div>
               <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                 <div className="flex items-center justify-center py-3">
@@ -357,7 +333,7 @@ export default function Analytics() {
                       <circle cx="21" cy="21" r="15.91549" fill="none" stroke="#991B1B" strokeWidth="4" strokeDasharray="1.9 98.1" strokeDashoffset="-98.1" />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-extrabold text-[#20312A] font-heading leading-none">{loading ? '...' : stats.total_screenings.toLocaleString()}</span>
+                      <span className="text-2xl font-extrabold text-[#20312A] font-heading leading-none">{loading ? '...' : (safeStats.total_screenings ?? 0).toLocaleString()}</span>
                       <span className="text-[10px] text-[#66756D] font-medium mt-0.5">Total Screenings</span>
                     </div>
                   </div>
@@ -375,7 +351,7 @@ export default function Analytics() {
                 </div>
                 <div className="p-3 bg-[#FFF7ED] rounded-lg border border-[#EA580C]/20 text-xs text-[#20312A] flex items-center justify-between">
                   <span className="font-medium">Total Referable Rate (Grade ≥ 2):</span>
-                  <span className="font-bold text-[#EA580C]">14.9% ({loading ? '...' : stats.referable_cases} cases)</span>
+                  <span className="font-bold text-[#EA580C]">14.9% ({loading ? '...' : (safeStats.referable_cases ?? 0)} cases)</span>
                 </div>
               </div>
             </section>

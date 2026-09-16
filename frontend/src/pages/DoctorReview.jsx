@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -14,13 +14,74 @@ import {
 } from 'lucide-react'
 import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
+import Skeleton from '../components/Skeleton'
 import { handleZoomIn, handleZoomOut, handleZoomReset } from '../lib/zoomHandlers'
-import { markPatientScreeningsReviewed } from '../lib/api'
+import { markPatientScreeningsReviewed, getPatient, getPendingScreenings } from '../lib/api'
+
+const GRADE_LABELS = { 0: 'No DR', 1: 'Mild NPDR', 2: 'Moderate NPDR', 3: 'Severe NPDR', 4: 'Proliferative DR' }
+
+function getUrgencyLabel(grade) {
+  if (grade >= 4) return 'Critical'
+  if (grade === 3) return 'Urgent'
+  if (grade === 2) return 'High'
+  return 'Routine'
+}
 
 export default function DoctorReview() {
   const { id } = useParams()
   const navigate = useNavigate()
   const patientId = id || 'DRI-2026-00419'
+
+  // Real, API-backed data — only available for numeric patient IDs (reached
+  // from a queue built off getPendingScreenings()). Demo/mock IDs fall back
+  // to the page's original static content below.
+  const [apiPatient, setApiPatient] = useState(null)
+  const [apiScreening, setApiScreening] = useState(null)
+  const [loadingReview, setLoadingReview] = useState(true)
+
+  useEffect(() => {
+    if (!/^\d+$/.test(patientId)) {
+      setApiPatient(null)
+      setApiScreening(null)
+      setLoadingReview(false)
+      return
+    }
+    let cancelled = false
+    setLoadingReview(true)
+    Promise.allSettled([getPatient(patientId), getPendingScreenings()]).then(([pRes, sRes]) => {
+      if (cancelled) return
+      if (pRes.status === 'fulfilled') setApiPatient(pRes.value)
+      if (sRes.status === 'fulfilled' && Array.isArray(sRes.value)) {
+        const match = sRes.value.find(s => String(s.patient_id) === patientId)
+        setApiScreening(match ?? null)
+      }
+      setLoadingReview(false)
+    })
+    return () => { cancelled = true }
+  }, [patientId])
+
+  const displayReview = {
+    name: apiPatient?.name || 'Ravi T.',
+    initials: apiPatient?.name
+      ? apiPatient.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
+      : 'RT',
+    ageGender: apiPatient?.age != null && apiPatient?.gender
+      ? `${apiPatient.age} yrs, ${apiPatient.gender}`
+      : '58 yrs, Male',
+    phc: apiPatient?.phc_id || 'PHC Chelur',
+    diabetesDuration: apiPatient?.diabetes_duration_years != null ? `${apiPatient.diabetes_duration_years} Years` : '12 Years',
+    hba1c: apiPatient?.hba1c_level != null ? `${apiPatient.hba1c_level}%` : '8.4%',
+    hypertension: apiPatient ? (apiPatient.hypertension ? 'Yes' : 'No') : 'Yes',
+    grade: apiScreening?.dr_grade ?? 4,
+    confidence: apiScreening?.dr_confidence ?? 91,
+    findings: apiScreening?.recommendation_text ||
+      'Model attention concentrated on regions suggestive of neovascularization and preretinal hemorrhage patterns in the superior temporal area.',
+    capturedAt: apiScreening?.created_at
+      ? new Date(apiScreening.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+      : 'Today, 7:55 AM',
+  }
+  const urgencyLabel = getUrgencyLabel(displayReview.grade)
+  const gradeLabel = GRADE_LABELS[displayReview.grade] ?? 'Unknown'
 
   // Retinal Image Analysis state
   const [activeLayer, setActiveLayer] = useState('original') // 'original', 'gradcam', 'vessel'
@@ -28,7 +89,14 @@ export default function DoctorReview() {
 
   // Clinical Decision State Machine
   const [isAiAgreed, setIsAiAgreed] = useState(true)
-  const [doctorGrade, setDoctorGrade] = useState('grade-4')
+  const [doctorGrade, setDoctorGrade] = useState(`grade-${displayReview.grade}`)
+
+  // Keep the doctor-confirmed grade dropdown in sync with the real AI grade
+  // once it loads (only while the doctor hasn't started overriding it).
+  useEffect(() => {
+    if (isAiAgreed) setDoctorGrade(`grade-${displayReview.grade}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayReview.grade])
   const [overrideAssessment, setOverrideAssessment] = useState('')
   const [overrideError, setOverrideError] = useState('')
   const [careInstructions, setCareInstructions] = useState(
@@ -59,7 +127,7 @@ export default function DoctorReview() {
     const checked = e.target.checked
     setIsAiAgreed(checked)
     if (checked) {
-      setDoctorGrade('grade-4')
+      setDoctorGrade(`grade-${displayReview.grade}`)
       setOverrideError('')
     } else {
       // Switched to override
@@ -169,7 +237,7 @@ export default function DoctorReview() {
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
             </span>
             <span className="text-xs sm:text-sm font-bold tracking-wide text-white">
-              Triage Status: Critical Review (Grade 4)
+              Triage Status: {urgencyLabel} Review (Grade {displayReview.grade})
             </span>
           </div>
           <span className="text-xs font-bold text-white bg-white/20 px-2.5 py-0.5 rounded-full border border-white/30 backdrop-blur-xs">
@@ -186,24 +254,24 @@ export default function DoctorReview() {
             {/* Left Demographics */}
             <div className="flex items-start sm:items-center space-x-3.5">
               <div className="w-12 h-12 rounded-xl bg-[#E6F4EA] text-[#14532D] border border-[#A7F3D0] flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-xs">
-                RT
+                {loadingReview ? <Skeleton className="w-6 h-4" /> : displayReview.initials}
               </div>
               <div>
                 <div className="flex items-center flex-wrap gap-2">
                   <h1 className="font-heading text-xl sm:text-2xl font-extrabold text-[#20312A] tracking-tight">
-                    Ravi T.
+                    {loadingReview ? <Skeleton className="h-6 w-32 inline-block align-middle" /> : displayReview.name}
                   </h1>
                   <span className="px-2 py-0.5 text-xs font-mono font-semibold bg-white text-[#20312A] border border-[#E2E7E3] rounded-md shadow-2xs">
                     {patientId}
                   </span>
                   <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-bold bg-[#450A0A] text-red-200 rounded-md border border-red-800">
-                    Critical Urgency
+                    {urgencyLabel} Urgency
                   </span>
                 </div>
                 <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-[#66756D] font-medium mt-1">
-                  <span><strong>Demographics:</strong> 58 yrs, Male</span>
+                  <span><strong>Demographics:</strong> {displayReview.ageGender}</span>
                   <span className="text-slate-300">•</span>
-                  <span><strong>PHC Unit:</strong> PHC Chelur</span>
+                  <span><strong>PHC Unit:</strong> {displayReview.phc}</span>
                   <span className="text-slate-300">•</span>
                   <span><strong>Referred By:</strong> Health Worker Kavya N.</span>
                 </div>
@@ -214,20 +282,19 @@ export default function DoctorReview() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:items-center gap-4 lg:gap-6 pt-3 lg:pt-0 border-t lg:border-t-0 border-[#E2E7E3]/60">
               <div className="text-left">
                 <div className="text-[10px] uppercase font-bold text-[#66756D] tracking-wider">Diabetes Duration</div>
-                <div className="text-xs font-bold text-[#20312A] mt-0.5">12 Years</div>
+                <div className="text-xs font-bold text-[#20312A] mt-0.5">{loadingReview ? <Skeleton className="h-4 w-14" /> : displayReview.diabetesDuration}</div>
               </div>
               <div className="hidden lg:block h-7 w-px bg-[#E2E7E3]" />
               <div className="text-left">
                 <div className="text-[10px] uppercase font-bold text-rose-700 tracking-wider">Latest HbA1c</div>
                 <div className="text-xs font-bold text-[#20312A] mt-0.5 flex items-center gap-1">
-                  <span className="text-rose-700 font-extrabold">8.4%</span>
-                  <span className="text-[10px] font-semibold text-rose-600">(Uncontrolled)</span>
+                  {loadingReview ? <Skeleton className="h-4 w-12" /> : <span className="text-rose-700 font-extrabold">{displayReview.hba1c}</span>}
                 </div>
               </div>
               <div className="hidden lg:block h-7 w-px bg-[#E2E7E3]" />
               <div className="text-left">
                 <div className="text-[10px] uppercase font-bold text-[#66756D] tracking-wider">Hypertension</div>
-                <div className="text-xs font-bold text-rose-600 mt-0.5">Yes</div>
+                <div className="text-xs font-bold text-rose-600 mt-0.5">{loadingReview ? <Skeleton className="h-4 w-8" /> : displayReview.hypertension}</div>
               </div>
               <div className="hidden lg:block h-7 w-px bg-[#E2E7E3]" />
               <div className="text-left">
@@ -237,7 +304,7 @@ export default function DoctorReview() {
               <div className="hidden lg:block h-7 w-px bg-[#E2E7E3]" />
               <div className="text-left col-span-2 sm:col-span-1">
                 <div className="text-[10px] uppercase font-bold text-[#66756D] tracking-wider">Captured</div>
-                <div className="text-xs font-bold text-[#20312A] mt-0.5">Today, 7:55 AM</div>
+                <div className="text-xs font-bold text-[#20312A] mt-0.5">{loadingReview ? <Skeleton className="h-4 w-20" /> : displayReview.capturedAt}</div>
               </div>
             </div>
           </div>
@@ -484,7 +551,7 @@ export default function DoctorReview() {
                 <div className="p-3.5 bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl flex flex-col justify-between">
                   <div className="text-[10px] uppercase font-bold text-[#66756D] tracking-wider mb-2">Predicted Grade</div>
                   <div>
-                    <GradeBadge grade={4} />
+                    {loadingReview ? <Skeleton className="h-6 w-20" /> : <GradeBadge grade={displayReview.grade} />}
                   </div>
                 </div>
 
@@ -492,10 +559,10 @@ export default function DoctorReview() {
                 <div className="p-3.5 bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl">
                   <div className="flex items-center justify-between text-[10px] uppercase font-bold text-[#66756D] tracking-wider">
                     <span>Confidence</span>
-                    <span className="text-xs font-bold text-[#20312A] font-mono">91%</span>
+                    <span className="text-xs font-bold text-[#20312A] font-mono">{loadingReview ? '...' : `${displayReview.confidence}%`}</span>
                   </div>
                   <div className="w-full bg-[#E2E7E3] rounded-full h-2 mt-2.5 overflow-hidden">
-                    <div className="bg-[#285943] h-2 rounded-full transition-all" style={{ width: '91%' }} />
+                    <div className="bg-[#285943] h-2 rounded-full transition-all" style={{ width: loadingReview ? '0%' : `${displayReview.confidence}%` }} />
                   </div>
                 </div>
 
@@ -504,14 +571,14 @@ export default function DoctorReview() {
                   <div className="text-[10px] uppercase font-bold text-rose-700 tracking-wider">Risk Level</div>
                   <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-rose-900">
                     <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
-                    <span>CRITICAL</span>
+                    <span>{loadingReview ? '...' : urgencyLabel.toUpperCase()}</span>
                   </div>
                 </div>
               </div>
 
               <div className="p-3.5 bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl">
                 <p className="text-xs text-[#20312A] leading-relaxed font-medium">
-                  Model attention concentrated on regions suggestive of neovascularization and preretinal hemorrhage patterns in the superior temporal area.
+                  {loadingReview ? <Skeleton className="h-4 w-full" /> : displayReview.findings}
                 </p>
               </div>
 
@@ -556,7 +623,7 @@ export default function DoctorReview() {
                         AI screening result is clinically correct
                       </div>
                       <div className="text-[11px] text-[#66756D] font-medium mt-0.5">
-                        AI Grade 4 · Proliferative DR
+                        AI Grade {displayReview.grade} · {gradeLabel}
                       </div>
                     </div>
                   </label>
@@ -584,7 +651,7 @@ export default function DoctorReview() {
                       Doctor-confirmed DR Grade <span className="text-rose-600">*</span>
                     </label>
                     <span className="text-[11px] text-[#66756D] font-mono">
-                      AI Baseline: Grade 4
+                      AI Baseline: Grade {displayReview.grade}
                     </span>
                   </div>
 
@@ -680,7 +747,7 @@ export default function DoctorReview() {
                     <label className="text-xs font-bold text-[#20312A] uppercase tracking-wider">
                       Referral & Action Plan <span className="text-rose-600">*</span>
                     </label>
-                    <span className="text-[11px] text-[#66756D] font-medium">Suggested by Grade 4</span>
+                    <span className="text-[11px] text-[#66756D] font-medium">Suggested by Grade {displayReview.grade}</span>
                   </div>
 
                   <div className="space-y-3">
@@ -828,7 +895,7 @@ export default function DoctorReview() {
                         className="h-4 w-4 text-[#16866A] accent-[#16866A] rounded border-[#E2E7E3] focus:ring-[#16866A] cursor-pointer"
                       />
                       <span className="text-xs font-medium text-[#20312A]">
-                        Notify PHC Chelur ASHA worker (Kavya N.) for immediate field coordination
+                        Notify {displayReview.phc} ASHA worker (Kavya N.) for immediate field coordination
                       </span>
                     </label>
                   </div>

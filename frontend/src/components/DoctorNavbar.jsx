@@ -10,7 +10,7 @@ import { Eye, LogOut, ChevronDown, Building2 } from 'lucide-react'
  * - Language selector including मराठी (MR)
  * - Role identity block (Dr. Arjun Sharma • Ophthalmologist)
  * - Logout icon -> /login
- * - Slim subnav: Review Queue | Referral Board
+ * - Slim subnav: Review Queue
  */
 export default function DoctorNavbar({
   doctorName = 'Dr. Arjun Sharma',
@@ -33,7 +33,6 @@ export default function DoctorNavbar({
   }, [])
 
   const isReviewQueue = location.pathname.startsWith('/doctor-dashboard') || location.pathname.startsWith('/doctor-review')
-  const isReferrals = location.pathname.startsWith('/referrals')
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative">
@@ -131,7 +130,7 @@ export default function DoctorNavbar({
         </div>
       </div>
 
-      {/* Slim Subnav: Review Queue | Referral Board */}
+      {/* Slim Subnav: Review Queue */}
       <div className="bg-[#F8FAF7] border-t border-[#E2E7E3]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1.5 h-10 overflow-x-auto py-1">
           <Link
@@ -139,12 +138,6 @@ export default function DoctorNavbar({
             className={isReviewQueue ? 'nav-active-pill' : 'nav-inactive-pill'}
           >
             Review Queue
-          </Link>
-          <Link
-            to="/referrals"
-            className={isReferrals ? 'nav-active-pill' : 'nav-inactive-pill'}
-          >
-            Referral Board
           </Link>
         </div>
       </div>
