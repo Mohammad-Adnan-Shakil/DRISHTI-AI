@@ -7,27 +7,28 @@ import { cn, RISK_TIER_STYLES, getRiskTierFromScore } from '../lib/utils'
 
 // Registration-time Risk Score — 7 weighted clinical factors, max 18 points,
 // captured before any AI screening exists so PHC staff can triage on sight.
+// Diabetes duration and HbA1c points are derived from the numeric inputs
+// above (Section B) rather than asked twice — see scoreDiabetesDuration /
+// scoreHba1c below.
+function scoreDiabetesDuration(years) {
+  const y = Number(years)
+  if (years === '' || years == null || !isFinite(y)) return 0
+  if (y >= 15) return 3
+  if (y >= 10) return 2
+  if (y >= 5) return 1
+  return 0
+}
+
+function scoreHba1c(value) {
+  const v = Number(value)
+  if (value === '' || value == null || !isFinite(v)) return 0
+  if (v >= 10) return 3
+  if (v >= 8.5) return 2
+  if (v >= 7) return 1
+  return 0
+}
+
 const RISK_SCORE_FIELDS = [
-  {
-    key: 'diabetesDurationScore',
-    label: 'Diabetes Duration (Risk Category)',
-    options: [
-      { label: '< 5 years', score: 0 },
-      { label: '5 – 10 years', score: 1 },
-      { label: '10 – 15 years', score: 2 },
-      { label: '> 15 years', score: 3 }
-    ]
-  },
-  {
-    key: 'hba1cScore',
-    label: 'HbA1c Level (Risk Category)',
-    options: [
-      { label: '< 7%', score: 0 },
-      { label: '7% – 8.5%', score: 1 },
-      { label: '8.5% – 10%', score: 2 },
-      { label: '> 10%', score: 3 }
-    ]
-  },
   {
     key: 'bpStatusScore',
     label: 'BP Status',
@@ -85,8 +86,6 @@ export default function Register() {
     preferredLanguage: '',
     phcId: 'PHC-HOSAKOTE',
     // Risk Score section — values hold the selected option's score (number) or '' if unselected
-    diabetesDurationScore: '',
-    hba1cScore: '',
     bpStatusScore: '',
     renalMarkerScore: '',
     insulinUseScore: 0,
@@ -94,12 +93,16 @@ export default function Register() {
     smokingStatusScore: ''
   })
 
+  const diabetesDurationScore = useMemo(() => scoreDiabetesDuration(formData.diabetesDuration), [formData.diabetesDuration])
+  const hba1cScore = useMemo(() => scoreHba1c(formData.hba1c), [formData.hba1c])
+
   const riskScoreTotal = useMemo(() => {
-    return RISK_SCORE_FIELDS.reduce((sum, field) => {
+    const dropdownSum = RISK_SCORE_FIELDS.reduce((sum, field) => {
       const val = formData[field.key]
       return sum + (val === '' || val == null ? 0 : Number(val))
-    }, Number(formData.insulinUseScore) || 0)
-  }, [formData])
+    }, 0)
+    return dropdownSum + diabetesDurationScore + hba1cScore + (Number(formData.insulinUseScore) || 0)
+  }, [formData, diabetesDurationScore, hba1cScore])
 
   const riskTierLabel = useMemo(() => getRiskTierFromScore(riskScoreTotal), [riskScoreTotal])
 
@@ -146,8 +149,8 @@ export default function Register() {
         hypertension: formData.hypertension === 'Yes',
         family_history_dr: formData.familyHistory === 'Yes',
         preferred_language: formData.preferredLanguage,
-        diabetes_duration_score: formData.diabetesDurationScore === '' ? null : Number(formData.diabetesDurationScore),
-        hba1c_score: formData.hba1cScore === '' ? null : Number(formData.hba1cScore),
+        diabetes_duration_score: diabetesDurationScore,
+        hba1c_score: hba1cScore,
         bp_status_score: formData.bpStatusScore === '' ? null : Number(formData.bpStatusScore),
         renal_marker_score: formData.renalMarkerScore === '' ? null : Number(formData.renalMarkerScore),
         insulin_use_score: Number(formData.insulinUseScore) || 0,
@@ -318,11 +321,6 @@ export default function Register() {
                       ))}
                     </div>
                     <p className="text-[11px] text-[#66756D] mt-1">First-degree relatives diagnosed</p>
-                  </div>
-
-                  {/* Divider + subheading separating clinical inputs from risk scoring */}
-                  <div className="sm:col-span-2 pt-2 pb-1 border-t border-[#E2E7E3] flex items-center gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#66756D] mt-2">Risk Stratification Score</span>
                   </div>
 
                   {/* Risk Score fields — weighted clinical risk profile (max 18 points) */}
