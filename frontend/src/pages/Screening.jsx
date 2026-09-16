@@ -502,7 +502,7 @@ export default function Screening() {
 
         {/* API Error Banner */}
         {apiError && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+          <div className="warning-banner p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>{apiError}</span>
           </div>

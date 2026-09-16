@@ -334,3 +334,9 @@
   transition: opacity 0.15s ease, transform 0.15s ease;
   pointer-events: none;
 }
+
+@media print {
+  .warning-banner {
+    display: none;
+  }
+}
