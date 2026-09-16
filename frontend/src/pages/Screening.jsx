@@ -209,6 +209,9 @@ export default function Screening() {
   // Simulated Grade (for demo override)
   const [simulatedGrade, setSimulatedGrade] = useState(2)
 
+  // Save/referral submission state — guards against double-submit
+  const [isSaving, setIsSaving] = useState(false)
+
   // Auto-select the patient just registered on the Register page (passed via
   // navigate('/screening', { state: { patientId, patientName } })).
   useEffect(() => {
@@ -217,25 +220,44 @@ export default function Screening() {
 
     const idStr = String(patientId)
     let cancelled = false
+    let retryTimer = null
 
-    ;(async () => {
+    const fallbackToRouteState = () => {
+      if (cancelled) return
+      // Fall back to the minimal info passed via route state
+      const mapped = mapApiPatientToDisplay({ id: Number(patientId), name: patientName || `Patient ${idStr}` })
+      setApiPatients(prev => ({ ...prev, [mapped.id]: mapped }))
+      setSelectedPatientId(mapped.id)
+    }
+
+    const fetchPatient = async (isRetry = false) => {
       try {
         const patient = await getPatient(idStr)
         if (cancelled) return
+        if (!patient) {
+          if (!isRetry) {
+            retryTimer = setTimeout(() => fetchPatient(true), 800)
+          } else {
+            fallbackToRouteState()
+          }
+          return
+        }
         const mapped = mapApiPatientToDisplay(patient)
         setApiPatients(prev => ({ ...prev, [mapped.id]: mapped }))
         setSelectedPatientId(mapped.id)
       } catch (err) {
         console.error('Failed to load registered patient:', err)
-        if (cancelled) return
-        // Fall back to the minimal info passed via route state
-        const mapped = mapApiPatientToDisplay({ id: Number(patientId), name: patientName || `Patient ${idStr}` })
-        setApiPatients(prev => ({ ...prev, [mapped.id]: mapped }))
-        setSelectedPatientId(mapped.id)
+        if (!isRetry) {
+          retryTimer = setTimeout(() => fetchPatient(true), 800)
+        } else {
+          fallbackToRouteState()
+        }
       }
-    })()
+    }
 
-    return () => { cancelled = true }
+    fetchPatient()
+
+    return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state])
 
@@ -406,6 +428,9 @@ export default function Screening() {
 
   // Save screening result
   const handleSaveScreening = async () => {
+    if (isSaving) return // already submitting — ignore repeat clicks
+    setIsSaving(true)
+
     if (!selectedPatient.realId) {
       // Demo patient (not backed by a real DB row) — nothing valid to save against.
       console.warn('Skipping saveScreening: no real patient_id for demo patient', selectedPatientId)
@@ -430,6 +455,8 @@ export default function Screening() {
       // Non-fatal — navigate anyway
     }
     navigate(gradeInfo.primaryActionRoute)
+    // Not resetting isSaving — the page navigates away, so the button stays
+    // disabled until this component unmounts.
   }
 
   const getStepIndex = (stepId) => STEPS.findIndex(s => s.id === stepId)
@@ -1051,9 +1078,16 @@ export default function Screening() {
 
                 {/* PRIMARY ACTION */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
-                  <button type="button" onClick={handleSaveScreening}
-                    className="flex-1 btn-gradient-pill min-h-[44px] h-12 px-6 text-sm font-bold shadow-sm hover:brightness-105 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer">
-                    <span>{gradeInfo.primaryActionLabel}</span>
+                  <button type="button" onClick={handleSaveScreening} disabled={isSaving}
+                    className="flex-1 btn-gradient-pill min-h-[44px] h-12 px-6 text-sm font-bold shadow-sm hover:brightness-105 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100">
+                    {isSaving ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <span>{gradeInfo.primaryActionLabel}</span>
+                    )}
                   </button>
                   <button type="button" onClick={() => window.print()}
                     className="min-h-[44px] h-12 px-4 bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold text-xs rounded-xl border border-[#E2E7E3] transition-colors flex items-center justify-center gap-2 cursor-pointer">

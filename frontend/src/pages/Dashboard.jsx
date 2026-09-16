@@ -75,7 +75,7 @@ function NeedsAttentionCard({ item }) {
       </div>
       <div className={cn('flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t gap-2 mt-auto', isPriority ? 'border-[#EF4444]/20' : 'border-[#F59E0B]/20')}>
         <span className="text-xs text-[#475569] hidden sm:inline">{isPriority ? 'Escalation target: District Eye Hospital' : 'Taluk Hospital / Tele-Ophthalmology'}</span>
-        <Link to={`/doctor-review/${item.id}`} className={cn(
+        <Link to={`/history/${item.id}`} className={cn(
           'min-h-[36px] inline-flex items-center justify-center px-4 py-2 text-xs font-semibold bg-white active:scale-[0.98] rounded-xl border focus:outline-none transition-colors cursor-pointer shadow-2xs',
           isPriority ? 'text-[#EF4444] hover:bg-red-50 border-[#EF4444]/35' : 'text-[#D97706] hover:bg-amber-50 border-[#F59E0B]/35'
         )}>

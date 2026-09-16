@@ -28,6 +28,45 @@ function getUrgency(grade) {
   return 'Routine'
 }
 
+// Collapses duplicate submissions for the same patient — e.g. a retry or
+// double-tap that created two near-identical screening records — keeping
+// only the latest when two records for the same patient_id land within 60s
+// of each other.
+function dedupeByPatientAndTime(records) {
+  const DEDUPE_WINDOW_MS = 60 * 1000
+  const byPatient = new Map()
+
+  for (const r of records) {
+    const pid = r.patient_id ?? r.id ?? 'unknown'
+    if (!byPatient.has(pid)) byPatient.set(pid, [])
+    byPatient.get(pid).push(r)
+  }
+
+  const result = []
+  for (const entries of byPatient.values()) {
+    const sorted = [...entries].sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+      return ta - tb
+    })
+
+    const kept = []
+    for (const entry of sorted) {
+      const ts = entry.created_at ? new Date(entry.created_at).getTime() : null
+      const last = kept[kept.length - 1]
+      const lastTs = last?.created_at ? new Date(last.created_at).getTime() : null
+      if (last && ts != null && lastTs != null && Math.abs(ts - lastTs) <= DEDUPE_WINDOW_MS) {
+        // Same patient, within the dedupe window — the later record wins.
+        kept[kept.length - 1] = entry
+      } else {
+        kept.push(entry)
+      }
+    }
+    result.push(...kept)
+  }
+  return result
+}
+
 export default function DoctorDashboard() {
   const navigate = useNavigate()
   const [filterSeverity, setFilterSeverity] = useState('all')
@@ -44,7 +83,8 @@ export default function DoctorDashboard() {
         ])
 
         if (pendingRes.status === 'fulfilled' && pendingRes.value?.length > 0) {
-          const mapped = pendingRes.value.map(s => ({
+          const deduped = dedupeByPatientAndTime(pendingRes.value)
+          const mapped = deduped.map(s => ({
             id: s.patient_id || s.id || 'DRI-2026-00000',
             name: s.patient_name || s.name || 'Patient',
             phc: s.phc_id || 'PHC Hosakote',
