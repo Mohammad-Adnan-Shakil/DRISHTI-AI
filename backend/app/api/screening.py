@@ -1,4 +1,5 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+﻿from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from pydantic import BaseModel
@@ -147,12 +148,34 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         .group_by(Screening.dr_grade)
     )
     total_patients = await db.execute(select(func.count(Patient.id)))
+
+    active_phcs = await db.execute(
+        select(func.count(func.distinct(Patient.phc_id)))
+        .join(Screening, Screening.patient_id == Patient.id)
+        .where(Patient.phc_id.isnot(None))
+    )
+    pending_reviews = await db.execute(
+        select(func.count(Screening.id))
+        .where(Screening.reviewed == False, Screening.referral_recommended == True)
+    )
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    reviewed_30d = await db.execute(
+        select(func.count(Screening.id))
+        .where(Screening.reviewed == True, Screening.created_at >= thirty_days_ago)
+    )
+
+    referrals_recommended_count = referrals.scalar()
+
     return {
         "total_screenings": total.scalar(),
-        "referrals_recommended": referrals.scalar(),
+        "referrals_recommended": referrals_recommended_count,
         "dme_cases": dme_cases.scalar(),
         "grade_distribution": {str(g): c for g, c in grade_dist.all()},
-        "total_patients": total_patients.scalar()
+        "total_patients": total_patients.scalar(),
+        "active_phcs": active_phcs.scalar(),
+        "pending_reviews": pending_reviews.scalar(),
+        "reviewed_30d": reviewed_30d.scalar(),
+        "referable_cases": referrals_recommended_count
     }
 
 @router.get("/screening/{screening_id}", response_model=ScreeningResponse)
