@@ -9,7 +9,9 @@ DATABASE_URL = base_url.replace("postgresql://", "postgresql+asyncpg://")
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    connect_args={"ssl": True}
+    connect_args={"ssl": True},
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
