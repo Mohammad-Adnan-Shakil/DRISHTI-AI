@@ -64,17 +64,35 @@ export default function PatientHistory() {
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const pdfRef = useRef(null)
 
-  // Display name — real for API-backed patients, the page's demo name
-  // otherwise (this page's visit timeline below is demo content either way).
-  const patientDisplayName = apiPatient?.name || 'Anitha R.'
-
-  const patientForPdf = {
-    id: activePatientId,
-    name: patientDisplayName,
+  // Demographics — real for API-backed patients (numeric IDs), the page's
+  // demo values otherwise. Note: the visit timeline/stat cards below have no
+  // backing history API yet, so they stay demo content either way.
+  const displayPatient = {
+    name: apiPatient?.name || 'Anitha R.',
+    initials: apiPatient?.name
+      ? apiPatient.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
+      : 'AR',
     ageGender: apiPatient?.age != null && apiPatient?.gender
       ? `${apiPatient.age} yrs • ${apiPatient.gender}`
       : '52 yrs • Female',
-    phc: apiPatient?.phc_id || 'PHC Hosakote'
+    phc: apiPatient?.phc_id || 'PHC Hosakote',
+    abhaId: apiPatient ? '—' : '91-4829-1049-2210',
+    diabetesDuration: apiPatient?.diabetes_duration_years != null ? `${apiPatient.diabetes_duration_years} Years` : '8 Years',
+    hba1c: apiPatient?.hba1c_level != null ? `${apiPatient.hba1c_level}%` : '7.8%',
+    hba1cElevated: apiPatient?.hba1c_level != null ? apiPatient.hba1c_level > 7 : true,
+    hypertension: apiPatient ? (apiPatient.hypertension ? 'Yes' : 'No') : 'Yes',
+    familyHistory: apiPatient ? (apiPatient.family_history_dr ? 'Positive' : 'Negative') : 'Negative',
+    preferredLanguage: apiPatient?.preferred_language || 'Kannada',
+  }
+
+  // Display name — kept as a separate binding for the PDF filename/toast.
+  const patientDisplayName = displayPatient.name
+
+  const patientForPdf = {
+    id: activePatientId,
+    name: displayPatient.name,
+    ageGender: displayPatient.ageGender,
+    phc: displayPatient.phc
   }
 
   // Mirrors the 5 visits shown in the Screening History timeline below.
@@ -206,7 +224,7 @@ export default function PatientHistory() {
             <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 font-medium">
               <Link to="/dashboard" className="hover:text-[#16866A] transition-colors">Patients</Link>
               <span className="text-slate-300">/</span>
-              <span className="text-slate-900 font-semibold">Anitha R. ({activePatientId})</span>
+              <span className="text-slate-900 font-semibold">{displayPatient.name} ({activePatientId})</span>
             </nav>
           </div>
           <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
@@ -236,12 +254,12 @@ export default function PatientHistory() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pb-2">
             <div className="flex items-start sm:items-center gap-4">
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#285943]/10 text-[#285943] flex items-center justify-center text-xl sm:text-2xl shrink-0 font-extrabold shadow-inner">
-                AR
+                {displayPatient.initials}
               </div>
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-heading">
-                    Anitha R.
+                    {displayPatient.name}
                   </h1>
                   <span className="px-2.5 py-0.5 rounded bg-[#285943]/10 border border-[#285943]/20 text-[#285943] font-mono text-xs font-semibold">
                     {activePatientId}
@@ -259,7 +277,7 @@ export default function PatientHistory() {
                   )}
                 </div>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  52 yrs • Female • PHC Hosakote • Primary ABHA ID: <span className="font-mono text-slate-700 font-medium">91-4829-1049-2210</span>
+                  {displayPatient.ageGender} • {displayPatient.phc} • Primary ABHA ID: <span className="font-mono text-slate-700 font-medium">{displayPatient.abhaId}</span>
                 </p>
               </div>
             </div>
@@ -296,31 +314,27 @@ export default function PatientHistory() {
           <div className="pt-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Diabetes Duration</span>
-              <span className="text-sm text-slate-900 mt-1 font-bold">8 Years</span>
-              <span className="text-[11px] text-slate-500">Type II (Insulin + Oral)</span>
+              <span className="text-sm text-slate-900 mt-1 font-bold">{displayPatient.diabetesDuration}</span>
             </div>
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex flex-col">
-              <span className="text-[10px] text-amber-800 uppercase tracking-wider font-semibold">Latest HbA1c</span>
+            <div className={cn('p-3 rounded-lg border flex flex-col', displayPatient.hba1cElevated ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200')}>
+              <span className={cn('text-[10px] uppercase tracking-wider font-semibold', displayPatient.hba1cElevated ? 'text-amber-800' : 'text-slate-500')}>Latest HbA1c</span>
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-sm text-amber-900 font-bold">7.8%</span>
-                <span className="text-xs font-bold text-amber-700">↑</span>
+                <span className={cn('text-sm font-bold', displayPatient.hba1cElevated ? 'text-amber-900' : 'text-slate-900')}>{displayPatient.hba1c}</span>
+                {displayPatient.hba1cElevated && <span className="text-xs font-bold text-amber-700">↑</span>}
               </div>
-              <span className="text-[11px] text-amber-800 font-medium">Elevated Glycemic</span>
+              <span className={cn('text-[11px] font-medium', displayPatient.hba1cElevated ? 'text-amber-800' : 'text-slate-500')}>{displayPatient.hba1cElevated ? 'Elevated Glycemic' : 'Controlled'}</span>
             </div>
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Hypertension</span>
-              <span className="text-sm text-slate-900 mt-1 font-bold">Yes (Controlled)</span>
-              <span className="text-[11px] text-slate-500">Amlodipine 5mg</span>
+              <span className="text-sm text-slate-900 mt-1 font-bold">{displayPatient.hypertension}</span>
             </div>
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Family DR History</span>
-              <span className="text-sm text-slate-900 mt-1 font-bold">Negative</span>
-              <span className="text-[11px] text-slate-500">No maternal/paternal DR</span>
+              <span className="text-sm text-slate-900 mt-1 font-bold">{displayPatient.familyHistory}</span>
             </div>
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Preferred Lang</span>
-              <span className="text-sm text-slate-900 mt-1 font-bold">Kannada</span>
-              <span className="text-[11px] text-slate-500">ಕನ್ನಡ (Audio Enabled)</span>
+              <span className="text-sm text-slate-900 mt-1 font-bold">{displayPatient.preferredLanguage}</span>
             </div>
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Last Screened</span>
@@ -1321,23 +1335,22 @@ export default function PatientHistory() {
             <div className="bg-[#F8FAF7] rounded-xl border border-[#E2E7E3] p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#66756D] block">Patient Name</span>
-                <span className="font-bold text-[#20312A] text-sm">Anitha R.</span>
-                <span className="text-[11px] text-[#66756D] block">52 Y · Female</span>
+                <span className="font-bold text-[#20312A] text-sm">{displayPatient.name}</span>
+                <span className="text-[11px] text-[#66756D] block">{displayPatient.ageGender}</span>
               </div>
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#66756D] block">Patient ID / ABHA</span>
                 <span className="font-mono font-semibold text-[#20312A]">{activePatientId}</span>
-                <span className="text-[10px] font-mono text-[#66756D] block">91-4829-1049-2210</span>
+                <span className="text-[10px] font-mono text-[#66756D] block">{displayPatient.abhaId}</span>
               </div>
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#66756D] block">Care History</span>
-                <span className="font-medium text-[#20312A]">Type II DM (8 yrs)</span>
-                <span className="text-[11px] text-[#66756D] block">HbA1c: 8.2% · Medicated</span>
+                <span className="font-medium text-[#20312A]">Type II DM ({displayPatient.diabetesDuration})</span>
+                <span className="text-[11px] text-[#66756D] block">HbA1c: {displayPatient.hba1c}</span>
               </div>
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#66756D] block">Primary Facility</span>
-                <span className="font-medium text-[#20312A]">PHC Hosakote</span>
-                <span className="text-[11px] text-[#66756D] block">Bangalore Rural Network</span>
+                <span className="font-medium text-[#20312A]">{displayPatient.phc}</span>
               </div>
             </div>
 
