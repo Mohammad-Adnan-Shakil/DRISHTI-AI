@@ -1,17 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Eye, LogOut, ChevronDown, Building2 } from 'lucide-react'
+import OfflineBanner from './OfflineBanner'
 
-/**
- * Navbar – Health Worker variant
- * Global Medical Chrome matching Forest & Teal design tokens:
- * - Slim top navbar with DRISHTI logo + "CLINICAL AI" pill + tagline
- * - Online/Offline pill (navigator.onLine aware)
- * - Language selector including मराठी (MR)
- * - Role identity block (Kavya N. • Health Worker)
- * - Logout icon -> /login
- * - Slim subnav for Dashboard | Screening | Register
- */
 export default function Navbar({
   facilityName = 'PHC Hosakote',
   workerName = 'Kavya N.',
@@ -38,12 +29,10 @@ export default function Navbar({
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative">
-      {/* Top 3px vibrant gradient accent bar */}
       <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-[#D9F99D] via-[#DCFCE7] to-[#CCFBF1]" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3">
-          {/* Left: Logo, Wordmark & Tagline */}
           <div className="flex items-center gap-3">
             <Link to="/dashboard" className="flex items-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-[#16866A] rounded-md p-1">
               <div className="rounded-full p-2.5 bg-gradient-to-br from-[#E6F4EA] to-[#CCFBF1] flex items-center justify-center shadow-xs">
@@ -59,7 +48,6 @@ export default function Navbar({
             </Link>
           </div>
 
-          {/* Center: Active PHC badge */}
           <div className="hidden md:flex items-center">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F8FAF7] text-[#20312A] border border-[#E2E7E3] text-xs font-medium">
               <Building2 className="w-3.5 h-3.5 text-[#66756D]" strokeWidth={2} />
@@ -67,9 +55,7 @@ export default function Navbar({
             </div>
           </div>
 
-          {/* Right: Connectivity, Language, Health Worker Profile & Logout */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Dynamic Connectivity Indicator */}
             <div
               aria-live="polite"
               className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
@@ -87,7 +73,6 @@ export default function Navbar({
               <span>{isOnline ? 'Online' : 'Offline'}</span>
             </div>
 
-            {/* Language Selector */}
             <div className="relative hidden sm:block">
               <select
                 aria-label="Select interface language"
@@ -104,10 +89,8 @@ export default function Navbar({
               <ChevronDown className="w-3.5 h-3.5 text-[#66756D] absolute right-2 top-2.5 pointer-events-none" strokeWidth={2} />
             </div>
 
-            {/* Divider */}
             <div className="w-px h-8 bg-gradient-to-b from-transparent via-[#E2E7E3] to-transparent hidden sm:block" />
 
-            {/* Health Worker Profile */}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#285943] to-[#16866A] text-white border-2 border-white shadow-sm flex items-center justify-center font-bold text-xs" title={`${workerName} (${workerRole})`}>
                 {workerInitials}
@@ -118,7 +101,6 @@ export default function Navbar({
               </div>
             </div>
 
-            {/* Logout Button */}
             <Link
               to="/login"
               aria-label="Sign out"
@@ -131,29 +113,15 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* Slim Subnav for HW role */}
       <div className="bg-[#F8FAF7] border-t border-[#E2E7E3]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1.5 h-10 overflow-x-auto py-1">
-          <Link
-            to="/dashboard"
-            className={isDashboard ? 'nav-active-pill' : 'nav-inactive-pill'}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/screening"
-            className={isScreening ? 'nav-active-pill' : 'nav-inactive-pill'}
-          >
-            New Screening
-          </Link>
-          <Link
-            to="/register"
-            className={isRegister ? 'nav-active-pill' : 'nav-inactive-pill'}
-          >
-            Register Patient
-          </Link>
+          <Link to="/dashboard" className={isDashboard ? 'nav-active-pill' : 'nav-inactive-pill'}>Dashboard</Link>
+          <Link to="/screening" className={isScreening ? 'nav-active-pill' : 'nav-inactive-pill'}>New Screening</Link>
+          <Link to="/register" className={isRegister ? 'nav-active-pill' : 'nav-inactive-pill'}>Register Patient</Link>
         </div>
       </div>
+
+      <OfflineBanner visible={!isOnline} />
     </header>
   )
 }

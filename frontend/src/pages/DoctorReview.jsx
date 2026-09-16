@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
+import { handleZoomIn, handleZoomOut, handleZoomReset } from '../lib/zoomHandlers'
 
 export default function DoctorReview() {
   const { id } = useParams()
@@ -41,10 +42,10 @@ export default function DoctorReview() {
   const [isDraftSaved, setIsDraftSaved] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
 
-  // Zoom handlers
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.2, 2.0))
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.2, 0.8))
-  const handleZoomReset = () => setZoomLevel(1.0)
+  // Zoom handlers (using shared utility)
+  const zoomIn = () => handleZoomIn(setZoomLevel)
+  const zoomOut = () => handleZoomOut(setZoomLevel)
+  const zoomReset = () => handleZoomReset(setZoomLevel)
 
   // Quick chips insertion for override rationale
   const handleInsertChip = (chipText) => {
@@ -412,7 +413,7 @@ export default function DoctorReview() {
                 <div className="absolute bottom-3 right-3 flex items-center bg-slate-900/90 backdrop-blur-xs border border-slate-700/80 rounded-xl p-1 text-white text-xs shadow-md gap-1">
                   <button
                     type="button"
-                    onClick={handleZoomIn}
+                    onClick={zoomIn}
                     className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-700 transition font-bold text-sm cursor-pointer"
                     title="Zoom In"
                   >
@@ -420,7 +421,7 @@ export default function DoctorReview() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleZoomOut}
+                    onClick={zoomOut}
                     className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-700 transition font-bold text-sm cursor-pointer"
                     title="Zoom Out"
                   >
@@ -428,7 +429,7 @@ export default function DoctorReview() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleZoomReset}
+                    onClick={zoomReset}
                     className="px-2 h-7 flex items-center justify-center rounded-lg hover:bg-slate-700 transition text-[11px] font-medium cursor-pointer"
                     title="Reset Zoom"
                   >
