@@ -870,7 +870,16 @@ export default function Screening() {
                     <span>Running quality check...</span>
                   </div>
                 ) : qualityError ? (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">{qualityError}</div>
+                  <>
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">{qualityError}</div>
+                    <div className="pt-2">
+                      <button type="button" onClick={startAIAnalysis}
+                        className="btn-gradient-pill w-full min-h-[44px] h-12 text-base font-bold shadow-md hover:shadow transition-all flex items-center justify-center gap-2.5 cursor-pointer">
+                        <Sparkles className="w-5 h-5 text-[#14532D]" />
+                        <span>Run AI Analysis</span>
+                      </button>
+                    </div>
+                  </>
                 ) : isQualityRejected ? (
                   <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-3">
                     <div className="flex items-center gap-2">
