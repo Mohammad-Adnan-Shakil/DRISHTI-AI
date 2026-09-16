@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   Search,
   Check,
@@ -131,6 +131,38 @@ const GRADE_CONFIG = {
   }
 }
 
+// Maps a backend PatientResponse (integer id, snake_case fields) onto the
+// display shape the rest of this page expects.
+function mapApiPatientToDisplay(patient) {
+  const initials = (patient.name || '?')
+    .split(' ')
+    .filter(Boolean)
+    .map(n => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  return {
+    realId: patient.id,
+    id: String(patient.id),
+    name: patient.name,
+    initials,
+    ageGender: patient.age != null && patient.gender
+      ? `${patient.age}${patient.gender[0].toUpperCase()} (${patient.age} yrs • ${patient.gender})`
+      : 'Not recorded',
+    phc: patient.phc_id || 'PHC Hosakote',
+    diabetesDuration: patient.diabetes_duration_years != null ? `${patient.diabetes_duration_years} Years` : 'Not recorded',
+    hba1c: patient.hba1c_level != null ? `${patient.hba1c_level}%` : 'Not recorded',
+    hypertension: patient.hypertension ? 'Yes' : 'No',
+    language: patient.preferred_language || 'English',
+    audioGuidance: true,
+    lastScreened: 'No prior screening on file',
+    priorGrade: 0,
+    priorGradeLabel: 'No prior grade on file',
+    abhaId: '—'
+  }
+}
+
 const STEPS = [
   { id: 'select-patient', number: 1, label: 'Select Patient' },
   { id: 'capture', number: 2, label: 'Capture Image' },
@@ -141,11 +173,15 @@ const STEPS = [
 
 export default function Screening() {
   const navigate = useNavigate()
+  const location = useLocation()
   const fileInputRef = useRef(null)
 
   const [screeningStep, setScreeningStep] = useState('capture')
   const [selectedPatientId, setSelectedPatientId] = useState('DRI-2026-00421')
   const [searchQuery, setSearchQuery] = useState('')
+  const [apiPatients, setApiPatients] = useState({})
+  const [patientLookupLoading, setPatientLookupLoading] = useState(false)
+  const [patientLookupError, setPatientLookupError] = useState(null)
   const [activeEye, setActiveEye] = useState('OD')
   const [activeLayer, setActiveLayer] = useState('original')
   const [zoomLevel, setZoomLevel] = useState(1.0)
@@ -173,7 +209,37 @@ export default function Screening() {
   // Simulated Grade (for demo override)
   const [simulatedGrade, setSimulatedGrade] = useState(2)
 
-  const selectedPatient = PATIENTS[selectedPatientId] || PATIENTS['DRI-2026-00421']
+  // Auto-select the patient just registered on the Register page (passed via
+  // navigate('/screening', { state: { patientId, patientName } })).
+  useEffect(() => {
+    const { patientId, patientName } = location.state || {}
+    if (patientId == null) return
+
+    const idStr = String(patientId)
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const patient = await getPatient(idStr)
+        if (cancelled) return
+        const mapped = mapApiPatientToDisplay(patient)
+        setApiPatients(prev => ({ ...prev, [mapped.id]: mapped }))
+        setSelectedPatientId(mapped.id)
+      } catch (err) {
+        console.error('Failed to load registered patient:', err)
+        if (cancelled) return
+        // Fall back to the minimal info passed via route state
+        const mapped = mapApiPatientToDisplay({ id: Number(patientId), name: patientName || `Patient ${idStr}` })
+        setApiPatients(prev => ({ ...prev, [mapped.id]: mapped }))
+        setSelectedPatientId(mapped.id)
+      }
+    })()
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state])
+
+  const selectedPatient = apiPatients[selectedPatientId] || PATIENTS[selectedPatientId] || PATIENTS['DRI-2026-00421']
 
   // Use real grade if available, else simulated
   const activeGrade = aiResult ? aiResult.grade : simulatedGrade
@@ -185,10 +251,35 @@ export default function Screening() {
   const zoomOut = () => handleZoomOut(setZoomLevel)
   const zoomReset = () => handleZoomReset(setZoomLevel)
 
-  const handleSearchSubmit = (e) => {
+  const handleSearchSubmit = async (e) => {
     e.preventDefault()
-    if (searchQuery.toLowerCase().includes('00418') || searchQuery.toLowerCase().includes('ramesh')) {
+    const query = searchQuery.trim()
+    setPatientLookupError(null)
+
+    // Real patient IDs from the backend are integers (see POST /api/patient).
+    // Only hit the API when the query looks like one — otherwise fall through
+    // to the local demo patients below.
+    if (/^\d+$/.test(query)) {
+      setPatientLookupLoading(true)
+      try {
+        const patient = await getPatient(query)
+        const mapped = mapApiPatientToDisplay(patient)
+        setApiPatients(prev => ({ ...prev, [mapped.id]: mapped }))
+        setSelectedPatientId(mapped.id)
+        return
+      } catch (err) {
+        console.error('Patient lookup failed:', err)
+        setPatientLookupError(`No patient found for ID ${query}.`)
+      } finally {
+        setPatientLookupLoading(false)
+      }
+      return
+    }
+
+    if (query.toLowerCase().includes('00418') || query.toLowerCase().includes('ramesh')) {
       setSelectedPatientId('DRI-2026-00418')
+    } else if (query) {
+      setPatientLookupError(`No patient found matching "${query}".`)
     } else {
       setSelectedPatientId('DRI-2026-00421')
     }
@@ -315,9 +406,16 @@ export default function Screening() {
 
   // Save screening result
   const handleSaveScreening = async () => {
+    if (!selectedPatient.realId) {
+      // Demo patient (not backed by a real DB row) — nothing valid to save against.
+      console.warn('Skipping saveScreening: no real patient_id for demo patient', selectedPatientId)
+      navigate(gradeInfo.primaryActionRoute)
+      return
+    }
+
     try {
       await saveScreening({
-        patient_id: selectedPatientId,
+        patient_id: selectedPatient.realId,
         dr_grade: activeGrade,
         dr_confidence: activeConfidence,
         quality_score: qualityScore,
@@ -459,8 +557,13 @@ export default function Screening() {
                     placeholder="Search by Patient ID (00421) or Name..."
                     className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-[#E2E7E3] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#16866A] text-[#20312A]" />
                 </div>
-                <button type="submit" className="px-4 py-2 text-xs font-semibold rounded-xl bg-white hover:bg-[#E6F4EA] text-[#20312A] border border-[#E2E7E3] shadow-2xs transition-colors cursor-pointer">Search</button>
+                <button type="submit" disabled={patientLookupLoading} className="px-4 py-2 text-xs font-semibold rounded-xl bg-white hover:bg-[#E6F4EA] text-[#20312A] border border-[#E2E7E3] shadow-2xs transition-colors cursor-pointer disabled:opacity-60">
+                  {patientLookupLoading ? 'Searching...' : 'Search'}
+                </button>
               </form>
+              {patientLookupError && (
+                <p className="mt-2 text-[11px] text-rose-600 font-medium">{patientLookupError}</p>
+              )}
               <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
                 <span className="text-[#66756D] text-[11px]">Recent:</span>
                 {['DRI-2026-00421', 'DRI-2026-00418'].map(pid => (

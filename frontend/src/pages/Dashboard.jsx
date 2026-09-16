@@ -8,6 +8,7 @@ import StatusBadge from '../components/StatusBadge'
 import StatCard from '../components/StatCard'
 import { cn } from '../lib/utils'
 import { getScreeningStats, getPendingScreenings } from '../lib/api'
+import { getQueueCount } from '../lib/db'
 
 function getConfidenceBarColor(confidence) {
   if (confidence >= 90) return 'bg-[#059669]'
@@ -31,44 +32,107 @@ const MOCK_STATS = {
   total_patients: 248,
 }
 
+const MOCK_NEEDS_ATTENTION = [
+  { id: 'DRI-2026-00411', name: 'Mahesh K.', time: '8:42 AM', eye: 'OS', grade: 3, confidence: 93, status: 'referral-created' },
+  { id: 'DRI-2026-00421', name: 'Anitha R.', time: '10:32 AM', eye: 'OD', grade: 2, confidence: 94, status: 'referral-created' },
+]
+
+// Card for a single patient in the "Needs Attention" section — styled red for
+// urgent (grade >= 3) referrals, amber for routine referral review.
+function NeedsAttentionCard({ item }) {
+  const isPriority = item.grade >= 3
+  const Icon = isPriority ? AlertTriangle : Send
+
+  return (
+    <div className={cn(
+      'border border-[#E2E7E3] border-l-4 rounded-2xl p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between transition-colors gap-4',
+      isPriority ? 'bg-red-50/50 border-l-[#EF4444] hover:border-[#EF4444]/40' : 'bg-amber-50/50 border-l-[#F59E0B] hover:border-[#F59E0B]/40'
+    )}>
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-base text-[#20312A]">{item.name}</span>
+            <span className="text-xs font-medium text-[#475569] font-mono">{item.id}</span>
+            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-[#475569] border border-slate-200">{item.eye === 'OS' ? 'OS (Left Eye)' : 'OD (Right Eye)'}</span>
+            {isPriority && <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#EF4444] text-white uppercase tracking-wider">PRIORITY</span>}
+          </div>
+          <span className="text-xs font-medium text-[#475569] whitespace-nowrap">{item.time}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <GradeBadge grade={item.grade} confidence={item.confidence} />
+          <span className={cn(
+            'inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full border',
+            isPriority ? 'text-[#DC2626] bg-red-100/80 border-[#EF4444]/30' : 'text-[#B45309] bg-amber-100/80 border-[#F59E0B]/30'
+          )}>
+            <Icon className={cn('w-3.5 h-3.5', isPriority ? 'text-[#DC2626]' : 'text-[#D97706]')} />
+            {isPriority ? 'Urgent Referral' : 'Referral Pending Doctor Review'}
+          </span>
+        </div>
+        <div className={cn('flex items-center gap-1.5 text-xs font-medium', isPriority ? 'text-[#DC2626]' : 'text-[#B45309]')}>
+          <Clock className={cn('w-3.5 h-3.5', isPriority ? 'text-[#EF4444]' : 'text-[#D97706]')} />
+          <span>{isPriority ? 'Action needed today: Contact patient & organize transit' : 'Awaiting tele-ophthalmology verification (within 14 days)'}</span>
+        </div>
+      </div>
+      <div className={cn('flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t gap-2 mt-auto', isPriority ? 'border-[#EF4444]/20' : 'border-[#F59E0B]/20')}>
+        <span className="text-xs text-[#475569] hidden sm:inline">{isPriority ? 'Escalation target: District Eye Hospital' : 'Taluk Hospital / Tele-Ophthalmology'}</span>
+        <Link to={`/doctor-review/${item.id}`} className={cn(
+          'min-h-[36px] inline-flex items-center justify-center px-4 py-2 text-xs font-semibold bg-white active:scale-[0.98] rounded-xl border focus:outline-none transition-colors cursor-pointer shadow-2xs',
+          isPriority ? 'text-[#EF4444] hover:bg-red-50 border-[#EF4444]/35' : 'text-[#D97706] hover:bg-amber-50 border-[#F59E0B]/35'
+        )}>
+          View Patient →
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const today = new Date()
   const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })
 
   const [stats, setStats] = useState(MOCK_STATS)
   const [recentScreenings, setRecentScreenings] = useState(MOCK_SCREENINGS)
+  const [needsAttention, setNeedsAttention] = useState(MOCK_NEEDS_ATTENTION)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [statsData, pendingData] = await Promise.allSettled([
+        const [statsData, pendingData, queueCount] = await Promise.allSettled([
           getScreeningStats(),
-          getPendingScreenings()
+          getPendingScreenings(),
+          getQueueCount()
         ])
 
-        if (statsData.status === 'fulfilled' && statsData.value) {
-          const s = statsData.value
-          setStats({
-            total_screenings: s.total_screenings ?? s.today_screenings ?? 12,
-            total_referrals: s.total_referrals ?? s.referrals_today ?? 3,
-            pending_sync: s.pending_sync ?? 5,
-            total_patients: s.total_patients ?? 248,
-          })
-        }
+        setStats(prev => {
+          const next = { ...prev }
+          if (statsData.status === 'fulfilled' && statsData.value) {
+            const s = statsData.value
+            next.total_screenings = s.total_screenings ?? prev.total_screenings
+            next.total_referrals = s.referrals_recommended ?? prev.total_referrals
+            next.total_patients = s.total_patients ?? prev.total_patients
+          }
+          // Pending Sync comes from the local offline queue (IndexedDB), not
+          // the backend — it works even when the backend is unreachable.
+          if (queueCount.status === 'fulfilled') {
+            next.pending_sync = queueCount.value
+          }
+          return next
+        })
 
         if (pendingData.status === 'fulfilled' && pendingData.value?.length > 0) {
-          // Map API response to display format
-          const mapped = pendingData.value.slice(0, 5).map(s => ({
-            id: s.patient_id || s.id || 'DRI-2026-00000',
-            name: s.patient_name || s.name || 'Patient',
+          // Map /api/screenings/pending response to display format
+          const mapped = pendingData.value.map(s => ({
+            id: s.patient_id ?? 'DRI-2026-00000',
+            name: s.patient_name || 'Patient',
             time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:-- AM',
             eye: s.eye || 'OD',
             grade: s.dr_grade ?? 0,
             confidence: s.dr_confidence ?? 90,
             status: s.referral_recommended ? 'referral-created' : 'screening-complete'
           }))
-          setRecentScreenings(mapped)
+          setRecentScreenings(mapped.slice(0, 5))
+          setNeedsAttention(mapped.slice(0, 2))
         }
       } catch (err) {
         console.error('Dashboard fetch failed, using mock data:', err)
@@ -177,69 +241,10 @@ export default function Dashboard() {
               </div>
               <p className="text-xs sm:text-sm text-[#475569]">Patients requiring follow-up</p>
             </div>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-[#EF4444] border border-[#EF4444]/25">2 action items</span>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-[#EF4444] border border-[#EF4444]/25">{needsAttention.length} action item{needsAttention.length === 1 ? '' : 's'}</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-red-50/50 border border-[#E2E7E3] border-l-4 border-l-[#EF4444] rounded-2xl p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between hover:border-[#EF4444]/40 transition-colors gap-4">
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-base text-[#20312A]">Mahesh K.</span>
-                    <span className="text-xs font-medium text-[#475569] font-mono">DRI-2026-00411</span>
-                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-[#475569] border border-slate-200">OS (Left Eye)</span>
-                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#EF4444] text-white uppercase tracking-wider">PRIORITY</span>
-                  </div>
-                  <span className="text-xs font-medium text-[#475569] whitespace-nowrap">8:42 AM</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <GradeBadge grade={3} confidence={93} />
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#DC2626] bg-red-100/80 px-2.5 py-0.5 rounded-full border border-[#EF4444]/30">
-                    <AlertTriangle className="w-3.5 h-3.5 text-[#DC2626]" />
-                    Urgent Referral
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-[#DC2626]">
-                  <Clock className="w-3.5 h-3.5 text-[#EF4444]" />
-                  <span>Action needed today: Contact patient &amp; organize transit</span>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-[#EF4444]/20 gap-2 mt-auto">
-                <span className="text-xs text-[#475569] hidden sm:inline">Escalation target: District Eye Hospital</span>
-                <Link to="/doctor-review/DRI-2026-00411" className="min-h-[36px] inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-[#EF4444] bg-white hover:bg-red-50 active:scale-[0.98] rounded-xl border border-[#EF4444]/35 focus:outline-none transition-colors cursor-pointer shadow-2xs">
-                  View Patient →
-                </Link>
-              </div>
-            </div>
-
-            <div className="bg-amber-50/50 border border-[#E2E7E3] border-l-4 border-l-[#F59E0B] rounded-2xl p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between hover:border-[#F59E0B]/40 transition-colors gap-4">
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-base text-[#20312A]">Anitha R.</span>
-                    <span className="text-xs font-medium text-[#475569] font-mono">DRI-2026-00421</span>
-                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-[#475569] border border-slate-200">OD (Right Eye)</span>
-                  </div>
-                  <span className="text-xs font-medium text-[#475569] whitespace-nowrap">10:32 AM</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <GradeBadge grade={2} confidence={94} />
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#B45309] bg-amber-100/80 px-2.5 py-0.5 rounded-full border border-[#F59E0B]/30">
-                    <Send className="w-3.5 h-3.5 text-[#D97706]" />
-                    Referral Pending Doctor Review
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-[#B45309]">
-                  <Clock className="w-3.5 h-3.5 text-[#D97706]" />
-                  <span>Awaiting tele-ophthalmology verification (within 14 days)</span>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t border-[#F59E0B]/20 gap-2 mt-auto">
-                <span className="text-xs text-[#475569] hidden sm:inline">Taluk Hospital / Tele-Ophthalmology</span>
-                <Link to="/doctor-review/DRI-2026-00421" className="min-h-[36px] inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-[#D97706] bg-white hover:bg-amber-50 active:scale-[0.98] rounded-xl border border-[#F59E0B]/35 focus:outline-none transition-colors cursor-pointer shadow-2xs">
-                  View Patient →
-                </Link>
-              </div>
-            </div>
+            {needsAttention.map(item => <NeedsAttentionCard key={item.id} item={item} />)}
           </div>
         </section>
 

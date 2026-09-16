@@ -25,6 +25,7 @@ export default function Register() {
   const [isRegistered, setIsRegistered] = useState(false)
   const [apiError, setApiError] = useState(null)
   const [registeredId, setRegisteredId] = useState(formData.patientId)
+  const [registeredName, setRegisteredName] = useState('')
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -64,7 +65,10 @@ export default function Register() {
         preferred_language: formData.preferredLanguage
       })
       // Use returned ID if available
-      if (result?.id) setRegisteredId(result.id)
+      if (result?.id) {
+        setRegisteredId(result.id)
+        setRegisteredName(result.name || formData.fullName)
+      }
       setIsRegistered(true)
     } catch (err) {
       console.error('Register patient failed:', err)
@@ -294,7 +298,9 @@ export default function Register() {
                 <Link to="/dashboard" className="min-h-[44px] h-11 w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 border border-[#E2E7E3] rounded-xl text-sm font-semibold text-[#20312A] bg-white hover:bg-[#E6F4EA] shadow-xs transition-colors">
                   Back to Dashboard
                 </Link>
-                <button type="button" onClick={() => navigate('/screening')}
+                <button type="button" onClick={() => navigate('/screening', typeof registeredId === 'number'
+                  ? { state: { patientId: registeredId, patientName: registeredName } }
+                  : undefined)}
                   className="min-h-[44px] h-11 w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-xl text-sm font-bold text-[#14532D] btn-gradient-pill shadow-xs hover:brightness-105 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
                   <span>Start Screening</span>
                   <ArrowRight className="w-4 h-4 ml-2 text-[#14532D]" />

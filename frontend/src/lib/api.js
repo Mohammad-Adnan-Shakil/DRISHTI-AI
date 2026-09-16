@@ -5,10 +5,10 @@
 
 const RENDER_URL = 'https://drishti-ai-69kp.onrender.com'
 
-// ⚠️ UPDATE THIS to your laptop's local IP before demo
-// Run `ipconfig` → find IPv4 Address under your WiFi adapter
-// Example: 'http://192.168.1.5:8000'
-const LOCAL_URL = 'https://drishti-ai-69kp.onrender.com'
+// Local FastAPI backend (classify + explain run the ONNX model locally)
+// ⚠️ If testing from a phone/other device on the same WiFi, swap this for
+// your laptop's LAN IP (run `ipconfig` → IPv4 Address), e.g. 'http://192.168.1.5:8000'
+const LOCAL_URL = 'http://localhost:8000'
 
 // ─────────────────────────────────────────────
 // HELPERS
