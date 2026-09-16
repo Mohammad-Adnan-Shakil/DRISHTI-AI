@@ -312,7 +312,7 @@ export default function Dashboard() {
                       </td>
                       <td className="py-4 px-5"><StatusBadge status={s.status} /></td>
                       <td className="py-4 px-6 text-right">
-                        <Link to={`/doctor-review/${s.id}`} className="inline-flex items-center justify-center px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] border border-transparent hover:border-[#E2E7E3] transition-colors cursor-pointer">
+                        <Link to={`/history/${s.id}`} className="inline-flex items-center justify-center px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] border border-transparent hover:border-[#E2E7E3] transition-colors cursor-pointer">
                           View
                         </Link>
                       </td>
@@ -337,7 +337,7 @@ export default function Dashboard() {
                 </div>
               ))
             ) : recentScreenings.map((s) => (
-              <Link key={s.id} to={`/doctor-review/${s.id}`} className="bg-white rounded-2xl border border-[#E2E7E3] p-4 shadow-[0_2px_12px_rgba(40,89,67,0.04)] space-y-3 block text-inherit no-underline hover:border-[#16866A] transition-colors">
+              <Link key={s.id} to={`/history/${s.id}`} className="bg-white rounded-2xl border border-[#E2E7E3] p-4 shadow-[0_2px_12px_rgba(40,89,67,0.04)] space-y-3 block text-inherit no-underline hover:border-[#16866A] transition-colors">
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="font-semibold text-sm text-[#20312A]">{s.name}</span>
