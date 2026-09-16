@@ -17,6 +17,7 @@ class ScreeningCreate(BaseModel):
     dme_present: bool = False
     dme_confidence: Optional[float] = None
     quality_score: Optional[int] = None
+    fundus_image_url: Optional[str] = None
     heatmap_url: Optional[str] = None
     vessel_map_url: Optional[str] = None
     risk_stratification: Optional[str] = None
@@ -32,6 +33,7 @@ class ScreeningResponse(BaseModel):
     dme_present: bool
     dme_confidence: Optional[float]
     quality_score: Optional[int]
+    fundus_image_url: Optional[str]
     heatmap_url: Optional[str]
     vessel_map_url: Optional[str]
     risk_stratification: Optional[str]
@@ -98,6 +100,7 @@ async def get_pending_screenings(db: AsyncSession = Depends(get_db)):
             "dr_confidence": s.dr_confidence,
             "dme_present": s.dme_present,
             "risk_stratification": s.risk_stratification,
+            "fundus_image_url": s.fundus_image_url,
             "heatmap_url": s.heatmap_url,
             "recommendation_text": s.recommendation_text,
             "referral_recommended": s.referral_recommended,
@@ -126,6 +129,7 @@ async def get_reviewed_screenings(db: AsyncSession = Depends(get_db)):
             "dr_confidence": s.dr_confidence,
             "dme_present": s.dme_present,
             "risk_stratification": s.risk_stratification,
+            "fundus_image_url": s.fundus_image_url,
             "heatmap_url": s.heatmap_url,
             "recommendation_text": s.recommendation_text,
             "referral_recommended": s.referral_recommended,
@@ -194,4 +198,24 @@ async def get_history(patient_id: int, db: AsyncSession = Depends(get_db)):
         .order_by(Screening.created_at.desc())
     )
     screenings = result.scalars().all()
-    return screenings
+    return [
+        {
+            "id": s.id,
+            "patient_id": s.patient_id,
+            "dr_grade": s.dr_grade,
+            "dr_confidence": s.dr_confidence,
+            "dme_present": s.dme_present,
+            "dme_confidence": s.dme_confidence,
+            "quality_score": s.quality_score,
+            "fundus_image_url": s.fundus_image_url,
+            "heatmap_url": s.heatmap_url,
+            "vessel_map_url": s.vessel_map_url,
+            "risk_stratification": s.risk_stratification,
+            "referral_recommended": s.referral_recommended,
+            "reviewed": s.reviewed,
+            "recommendation_text": s.recommendation_text,
+            "recommendation_language": s.recommendation_language,
+            "created_at": s.created_at.isoformat() if s.created_at else None
+        }
+        for s in screenings
+    ]

@@ -30,56 +30,6 @@ function formatDateForFilename(date) {
   return `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`
 }
 
-function formatTimestampForFilename(date) {
-  return `${formatDateForFilename(date)}_${pad2(date.getHours())}${pad2(date.getMinutes())}`
-}
-
-// ─────────────────────────────────────────────
-// REFERRAL LOG CSV
-// ─────────────────────────────────────────────
-
-// Matches the 12 fields on each mapped referral row in Referrals.jsx
-// (see the `mapped` array built from getPendingReferrals()).
-const REFERRAL_COLUMNS = [
-  { key: 'id', header: 'Patient ID' },
-  { key: 'name', header: 'Patient Name' },
-  { key: 'drGrade', header: 'DR Grade' },
-  { key: 'phc', header: 'PHC Unit' },
-  { key: 'urgency', header: 'Urgency' },
-  { key: 'urgencyType', header: 'Urgency Type' },
-  { key: 'referredOn', header: 'Referred On' },
-  { key: 'status', header: 'Status' },
-  { key: 'referralId', header: 'Referral ID' },
-  { key: 'aiConfidence', header: 'AI Confidence' },
-  { key: 'doctorStance', header: 'Doctor Stance' },
-  { key: 'handoffNotes', header: 'Handoff Notes' },
-]
-
-/**
- * Exports the given (already-filtered) referrals array as a CSV download.
- * @param {Array<object>} referralsArray
- * @returns {string} the filename that was downloaded
- */
-export function exportReferralsToCSV(referralsArray) {
-  const now = new Date()
-  const metadata = [
-    '# DRISHTI-AI Referral Log Export',
-    `# Generated: ${now.toLocaleString('en-GB')}`,
-    `# Total Records: ${referralsArray.length}`,
-    '# Facility Network: PHC Hosakote / PHC Chelur / PHC Chintamani (Karnataka Rural Tele-Retina Network)',
-  ]
-
-  const headerRow = REFERRAL_COLUMNS.map(c => escapeCsvField(c.header)).join(',')
-  const dataRows = referralsArray.map(row =>
-    REFERRAL_COLUMNS.map(c => escapeCsvField(row[c.key])).join(',')
-  )
-
-  const csvContent = [...metadata, '', headerRow, ...dataRows].join('\r\n')
-  const filename = `DRISHTI_Referral_Log_${formatTimestampForFilename(now)}.csv`
-  downloadCsv(csvContent, filename)
-  return filename
-}
-
 // ─────────────────────────────────────────────
 // SYSTEM ANALYTICS CSV
 // ─────────────────────────────────────────────

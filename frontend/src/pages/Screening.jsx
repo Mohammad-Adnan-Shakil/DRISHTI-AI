@@ -105,7 +105,7 @@ const GRADE_CONFIG = {
     recommendation: 'Visit an eye specialist at the district hospital within 2-4 weeks.',
     timeframe: 'Recommended evaluation: Within 2–4 weeks',
     primaryActionLabel: '↗ Save & Create Referral',
-    primaryActionRoute: '/referrals',
+    primaryActionRoute: '/dashboard',
     urgencyText: 'High Urgency Referral'
   },
   3: {
@@ -117,7 +117,7 @@ const GRADE_CONFIG = {
     recommendation: 'Visit an eye specialist urgently within 1-2 weeks.',
     timeframe: 'Urgent referral: Within 1–2 weeks',
     primaryActionLabel: '↗ Save & Create Referral',
-    primaryActionRoute: '/referrals',
+    primaryActionRoute: '/dashboard',
     urgencyText: 'Urgent Ophthalmology Referral'
   },
   4: {
@@ -129,7 +129,7 @@ const GRADE_CONFIG = {
     recommendation: 'Go to a specialist hospital within 48 hours. Do not delay.',
     timeframe: 'Immediate referral: Within 48–72 hours',
     primaryActionLabel: '↗ Save & Create Referral',
-    primaryActionRoute: '/referrals',
+    primaryActionRoute: '/dashboard',
     urgencyText: 'Critical Sight-Threatening Emergency'
   }
 }
@@ -206,6 +206,7 @@ export default function Screening() {
   // Real AI results
   const [aiResult, setAiResult] = useState(null)
   const [heatmapUrl, setHeatmapUrl] = useState(null)
+  const [fundusImageUrl, setFundusImageUrl] = useState(null)
   const [recommendationText, setRecommendationText] = useState(null)
   const [apiError, setApiError] = useState(null)
 
@@ -371,6 +372,7 @@ export default function Screening() {
         gradeResult = await classify(uploadedFile)
         setAiResult(gradeResult)
         setSimulatedGrade(gradeResult.grade)
+        setFundusImageUrl(gradeResult.fundus_image_url)
       }
       setPipelineStage(3); setAnalysisProgress(60)
 
@@ -440,6 +442,7 @@ export default function Screening() {
         dr_grade: activeGrade,
         dr_confidence: activeConfidence,
         quality_score: qualityScore,
+        fundus_image_url: fundusImageUrl ?? '',
         heatmap_url: heatmapUrl ?? '',
         risk_stratification: gradeInfo.risk,
         referral_recommended: activeGrade >= 2,
@@ -782,8 +785,14 @@ export default function Screening() {
                   {/* Show real heatmap if available and gradcam layer selected */}
                   {activeLayer === 'gradcam' && heatmapUrl ? (
                     <img
-                      src={`https://drishti-ai-69kp.onrender.com${heatmapUrl}`}
+                      src={`http://localhost:8000${heatmapUrl}`}
                       alt="Grad-CAM Heatmap"
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (activeLayer === 'original' || activeLayer === 'vessel' || activeLayer === 'compare') && fundusImageUrl ? (
+                    <img
+                      src={`http://localhost:8000${fundusImageUrl}`}
+                      alt="Fundus Photo"
                       className="w-full h-full object-contain"
                     />
                   ) : (
@@ -1142,7 +1151,7 @@ export default function Screening() {
           activeConfidence={activeConfidence}
           activeEye={activeEye}
           gradeInfo={gradeInfo}
-          gradcamUrl={heatmapUrl ? `https://drishti-ai-69kp.onrender.com${heatmapUrl}` : null}
+          gradcamUrl={heatmapUrl ? `http://localhost:8000${heatmapUrl}` : null}
           recommendationText={recommendationText}
           qualityScore={qualityScore}
         />

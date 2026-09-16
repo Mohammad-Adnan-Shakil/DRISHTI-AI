@@ -79,6 +79,8 @@ export default function DoctorReview() {
     capturedAt: apiScreening?.created_at
       ? new Date(apiScreening.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
       : 'Today, 7:55 AM',
+    fundusUrl: apiScreening?.fundus_image_url ? `http://localhost:8000${apiScreening.fundus_image_url}` : null,
+    heatmapUrl: apiScreening?.heatmap_url ? `http://localhost:8000${apiScreening.heatmap_url}` : null,
   }
   const urgencyLabel = getUrgencyLabel(displayReview.grade)
   const gradeLabel = GRADE_LABELS[displayReview.grade] ?? 'Unknown'
@@ -381,6 +383,19 @@ export default function DoctorReview() {
                   className="relative w-full h-full flex items-center justify-center transition-transform duration-200"
                   style={{ transform: `scale(${zoomLevel})` }}
                 >
+                  {activeLayer === 'original' && displayReview.fundusUrl ? (
+                    <img
+                      src={displayReview.fundusUrl}
+                      alt="Fundus Photo"
+                      className="w-full h-full max-h-[440px] object-contain"
+                    />
+                  ) : activeLayer === 'gradcam' && displayReview.heatmapUrl ? (
+                    <img
+                      src={displayReview.heatmapUrl}
+                      alt="Grad-CAM Heatmap"
+                      className="w-full h-full max-h-[440px] object-contain"
+                    />
+                  ) : (
                   <svg className="w-full h-full max-h-[440px]" viewBox="0 0 600 450" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                       <radialGradient cx="50%" cy="50%" id="docRevFundusBg" r="50%">
@@ -485,6 +500,7 @@ export default function DoctorReview() {
                       </g>
                     )}
                   </svg>
+                  )}
                 </div>
 
                 {/* ZOOM CONTROLS */}

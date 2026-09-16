@@ -12,6 +12,7 @@ class Screening(Base):
     dme_present             = Column(Boolean, default=False)
     dme_confidence          = Column(Float, nullable=True)
     quality_score           = Column(Integer, nullable=True)
+    fundus_image_url        = Column(String, nullable=True)
     heatmap_url             = Column(String, nullable=True)
     vessel_map_url          = Column(String, nullable=True)
     risk_stratification     = Column(String, nullable=True)

@@ -1,4 +1,4 @@
-import uuid
+from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -8,7 +8,7 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from app.services.model_service import classifier
 
-HEATMAP_DIR = Path("static/heatmaps")
+HEATMAP_DIR = Path("static/screenings/gradcam")
 HEATMAP_DIR.mkdir(parents=True, exist_ok=True)
 
 INPUT_SIZE = 380
@@ -78,13 +78,14 @@ def generate_gradcam(image_path: str, target_grade: int = None) -> dict:
     cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
 
     # Save heatmap
-    heatmap_filename = f"gradcam_{uuid.uuid4().hex}.jpg"
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    heatmap_filename = f"{timestamp}_gradcam.jpg"
     heatmap_path = str(HEATMAP_DIR / heatmap_filename)
     cv2.imwrite(heatmap_path, cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR))
 
     return {
         "heatmap_path": heatmap_path,
-        "heatmap_url": f"/static/heatmaps/{heatmap_filename}",
+        "heatmap_url": f"/static/screenings/gradcam/{heatmap_filename}",
         "target_grade": target_grade,
         "cam_intensity": float(np.mean(grayscale_cam))
     }

@@ -15,7 +15,6 @@ import {
   FileCheck,
   Check,
   X,
-  ExternalLink,
   Activity,
   Layers,
   Award,
@@ -25,7 +24,7 @@ import {
 import Navbar from '../components/Navbar'
 import GradeBadge from '../components/GradeBadge'
 import PatientHistoryPDF from '../components/PatientHistoryPDF'
-import { getPatient } from '../lib/api'
+import { getPatient, getPatientHistory } from '../lib/api'
 import { cn, RISK_TIER_STYLES } from '../lib/utils'
 import { exportNodeToPdf, sanitizeFilenameSegment } from '../lib/pdfExport'
 
@@ -37,18 +36,27 @@ export default function PatientHistory() {
   // Risk Score tier is only available for real, API-backed patients
   // (numeric IDs from POST /api/patient) — demo/mock patient IDs have none.
   const [apiPatient, setApiPatient] = useState(null)
+  const [apiScreeningHistory, setApiScreeningHistory] = useState([])
 
   useEffect(() => {
     if (!/^\d+$/.test(activePatientId)) {
       setApiPatient(null)
+      setApiScreeningHistory([])
       return
     }
     let cancelled = false
     getPatient(activePatientId)
       .then(p => { if (!cancelled) setApiPatient(p) })
       .catch(() => { if (!cancelled) setApiPatient(null) })
+    getPatientHistory(activePatientId)
+      .then(h => { if (!cancelled) setApiScreeningHistory(Array.isArray(h) ? h : []) })
+      .catch(() => { if (!cancelled) setApiScreeningHistory([]) })
     return () => { cancelled = true }
   }, [activePatientId])
+
+  // Most recent screening (server already orders history by created_at desc)
+  // — drives the real fundus/Grad-CAM images in VISIT 1's viewer below.
+  const latestScreening = apiScreeningHistory[0] || null
 
   const [activeLayer, setActiveLayer] = useState('original') // 'original' | 'gradcam' | 'vessels'
   const [expandedVisits, setExpandedVisits] = useState({
@@ -183,12 +191,6 @@ export default function PatientHistory() {
             >
               Screening
             </Link>
-            <Link
-              to="/referrals"
-              className="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors font-medium"
-            >
-              Referrals
-            </Link>
             <span className="px-3 py-1 rounded-md bg-white text-[#285943] font-semibold shadow-xs border border-slate-200">
               Patient History
             </span>
@@ -277,13 +279,6 @@ export default function PatientHistory() {
                 {isExportingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 <span>{isExportingPdf ? 'Exporting...' : 'Export Summary'}</span>
               </button>
-              <Link
-                to="/referrals"
-                className="h-10 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors"
-              >
-                <Send className="w-4 h-4 text-teal-600" />
-                <span>View Referral</span>
-              </Link>
               <Link
                 to="/screening"
                 className="btn-gradient-pill min-h-[44px] h-10 px-4 text-xs sm:text-sm font-bold inline-flex items-center gap-2 transition-all shadow-xs"
@@ -387,13 +382,10 @@ export default function PatientHistory() {
           </div>
 
           {/* Card 4: Referral Status */}
-          <div
-            onClick={() => navigate('/referrals')}
-            className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between space-y-4 cursor-pointer hover:border-[#285943] hover:ring-2 hover:ring-[#285943]/20 transition-all group"
-          >
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Referral Status</span>
-              <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
                 <Send className="w-4 h-4" />
               </div>
             </div>
@@ -404,12 +396,9 @@ export default function PatientHistory() {
               </div>
               <p className="text-xs text-slate-500 mt-2">Dispatched to Dr. Arjun Sharma</p>
             </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-medium">
-              <div className="flex items-center gap-1 text-slate-700 truncate">
-                <Building className="w-3.5 h-3.5 text-[#16866A] shrink-0" />
-                <span className="truncate">Apex Eye Hospital, Bangalore</span>
-              </div>
-              <ExternalLink className="w-3.5 h-3.5 text-[#285943] shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            <div className="pt-2 border-t border-slate-100 flex items-center gap-1 text-xs text-slate-600 font-medium">
+              <Building className="w-3.5 h-3.5 text-[#16866A] shrink-0" />
+              <span className="truncate">Apex Eye Hospital, Bangalore</span>
             </div>
           </div>
         </div>
@@ -723,6 +712,13 @@ export default function PatientHistory() {
                       <div className="relative w-full min-h-[420px] sm:min-h-[460px] aspect-[4/3] rounded-2xl bg-slate-950 overflow-hidden border border-slate-800 flex items-center justify-center shadow-lg">
                         {/* Layer 1: Original Fundus */}
                         <div className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${activeLayer === 'original' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                          {latestScreening?.fundus_image_url ? (
+                            <img
+                              src={`http://localhost:8000${latestScreening.fundus_image_url}`}
+                              alt="Retinal fundus photo OD"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
                           <svg aria-label="Retinal fundus photo OD" className="w-full h-full object-cover" fill="none" viewBox="0 0 600 450">
                             <rect fill="#1A0B08" height="450" width="600" />
                             <circle cx="300" cy="225" fill="#8B2500" opacity="0.9" r="185" />
@@ -738,6 +734,7 @@ export default function PatientHistory() {
                             <circle cx="368" cy="278" fill="#FF1A1A" r="5.5" />
                             <circle cx="315" cy="300" fill="#FF1A1A" r="5.5" />
                           </svg>
+                          )}
                           <span className="absolute bottom-3 left-3 px-3 py-1 rounded-md bg-black/80 text-white text-xs font-semibold backdrop-blur-xs border border-white/10">
                             45° Macula-Centered (OD) • ISO 100 • 50% Enlarged Clinical View
                           </span>
@@ -745,6 +742,13 @@ export default function PatientHistory() {
 
                         {/* Layer 2: Grad-CAM */}
                         <div className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${activeLayer === 'gradcam' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                          {latestScreening?.heatmap_url ? (
+                            <img
+                              src={`http://localhost:8000${latestScreening.heatmap_url}`}
+                              alt="Grad-CAM heatmap"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
                           <svg aria-label="Grad-CAM heatmap" className="w-full h-full object-cover" fill="none" viewBox="0 0 600 450">
                             <rect fill="#0F172A" height="450" width="600" />
                             <circle cx="300" cy="225" fill="#1E293B" r="175" />
@@ -754,6 +758,7 @@ export default function PatientHistory() {
                             <ellipse cx="322" cy="292" fill="#EF4444" filter="blur(15px)" opacity="0.6" rx="48" ry="36" />
                             <circle cx="195" cy="222" fill="none" r="24" stroke="#38BDF8" strokeDasharray="4 4" strokeWidth="3" />
                           </svg>
+                          )}
                           <span className="absolute bottom-3 left-3 px-3 py-1 rounded-md bg-black/80 text-teal-300 text-xs font-semibold backdrop-blur-xs border border-teal-500/20">
                             Grad-CAM Salience: Inferior-Temporal Microaneurysms
                           </span>
@@ -871,15 +876,6 @@ export default function PatientHistory() {
                           </div>
                         </div>
                       </div>
-
-                      {/* Track Referral Button */}
-                      <Link
-                        to="/referrals"
-                        className="w-full min-h-[44px] px-4 rounded-xl bg-gradient-to-r from-[#D9F99D] via-[#DCFCE7] to-[#CCFBF1] text-[#14532D] font-bold text-xs sm:text-sm inline-flex items-center justify-center gap-2 border border-[#A7F3D0] shadow-xs hover:brightness-105 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer"
-                      >
-                        <ExternalLink className="w-4 h-4 text-[#14532D]" />
-                        <span>Track Referral on Board →</span>
-                      </Link>
                     </div>
                   </div>
                 </div>

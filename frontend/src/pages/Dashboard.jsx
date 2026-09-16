@@ -203,7 +203,7 @@ export default function Dashboard() {
         <section aria-label="Clinical Metrics Overview">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             <StatCard title="Today's Screenings" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_screenings ?? 0)} subtitle="Completed at PHC Hosakote" icon={Eye} accentColor="teal" />
-            <StatCard title="Referrals Today" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_referrals ?? 0)} subtitle="Sent to District Eye Hospital" icon={Send} accentColor="amber" href="/referrals">
+            <StatCard title="Referrals Today" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_referrals ?? 0)} subtitle="Sent to District Eye Hospital" icon={Send} accentColor="amber">
               <span className="text-xs font-semibold text-[#B45309] bg-amber-50 px-2 py-0.5 rounded-full border border-[#F59E0B]/30">Requires follow-up</span>
             </StatCard>
             <StatCard title="Pending Sync" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.pending_sync ?? 0)} subtitle="Screenings waiting to sync" icon={Users} accentColor="slate" />

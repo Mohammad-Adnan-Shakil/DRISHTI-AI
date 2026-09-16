@@ -56,7 +56,7 @@ export async function qualityCheck(imageFile) {
 /**
  * POST /api/classify  — runs on LOCAL backend
  * @param {File} imageFile
- * @returns {{ grade, label, confidence, risk, action, all_probs }}
+ * @returns {{ grade, label, confidence, risk, action, all_probs, fundus_image_url }}
  */
 export async function classify(imageFile) {
   const form = new FormData()
@@ -191,31 +191,6 @@ export async function getScreeningStats() {
  */
 export async function createReferral(payload) {
   return post(LOCAL_URL, '/api/referral', payload)
-}
-
-/**
- * PATCH /api/referral/:id
- * @param {string|number} referralId
- * @param {{ status, doctor_notes, ophthalmologist_grade }} payload
- */
-export async function updateReferral(referralId, payload) {
-  const res = await fetch(`${LOCAL_URL}/api/referral/${referralId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`PATCH /api/referral/${referralId} failed [${res.status}]: ${err}`)
-  }
-  return res.json()
-}
-
-/**
- * GET /api/referrals/pending
- */
-export async function getPendingReferrals() {
-  return get(LOCAL_URL, '/api/referrals/pending')
 }
 
 /**

@@ -28,7 +28,11 @@ export default function Analytics() {
           const s = sRes.value
           setStats(prev => ({
             total_screenings: s.total_screenings ?? prev?.total_screenings ?? 0,
-            referable_cases: s.referable_cases ?? prev?.referable_cases ?? 0,
+            // Backend's /api/screenings/stats names this field
+            // "referrals_recommended" (count of screenings with
+            // referral_recommended = true) — "referable_cases" was never
+            // the real key, hence it always fell back to 0.
+            referable_cases: s.referrals_recommended ?? s.referable_cases ?? prev?.referable_cases ?? 0,
             active_phcs: s.active_phcs ?? prev?.active_phcs ?? 0,
             pending_reviews: s.pending_reviews ?? prev?.pending_reviews ?? 0,
             reviewed_30d: s.reviewed_30d ?? prev?.reviewed_30d ?? 0,

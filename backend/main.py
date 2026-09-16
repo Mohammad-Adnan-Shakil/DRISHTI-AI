@@ -1,8 +1,14 @@
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import classify, explain, recommend, patient, screening, referral, quality
 from app.core.config import settings
 from fastapi.staticfiles import StaticFiles
+
+# Ensure static storage directories exist before the app starts serving —
+# real fundus photos and Grad-CAM heatmaps are written here.
+Path("static/screenings/fundus").mkdir(parents=True, exist_ok=True)
+Path("static/screenings/gradcam").mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="DRISHTI-AI", version="1.0.0")
 app.mount("/static", StaticFiles(directory="static"), name="static")

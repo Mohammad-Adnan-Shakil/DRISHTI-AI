@@ -10,7 +10,7 @@ import { Eye, LogOut, ChevronDown, Building2 } from 'lucide-react'
  * - Language selector including मराठी (MR)
  * - Role identity block (Admin User • System Administrator)
  * - Logout icon -> /login
- * - Slim subnav for Analytics | Referrals | Doctor Dashboard | Screening
+ * - Slim subnav for Analytics | Doctor Dashboard | Screening
  */
 export default function AdminNavbar({
   adminName = 'Admin User',
@@ -33,7 +33,6 @@ export default function AdminNavbar({
   }, [])
 
   const isAnalytics = location.pathname === '/analytics'
-  const isReferrals = location.pathname === '/referrals'
   const isDoctor = location.pathname.startsWith('/doctor-dashboard')
   const isScreening = location.pathname === '/screening'
 
@@ -140,12 +139,6 @@ export default function AdminNavbar({
             className={isAnalytics ? 'nav-active-pill' : 'nav-inactive-pill'}
           >
             Analytics
-          </Link>
-          <Link
-            to="/referrals"
-            className={isReferrals ? 'nav-active-pill' : 'nav-inactive-pill'}
-          >
-            Referrals
           </Link>
           <Link
             to="/doctor-dashboard"
