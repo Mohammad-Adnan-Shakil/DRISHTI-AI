@@ -21,11 +21,11 @@ DR_GRADE_LABELS = {
 }
 
 RISK_ACTIONS = {
-    0: "annual screening",
-    1: "follow-up in 6 months",
-    2: "referral to ophthalmologist within 2 to 4 weeks",
-    3: "urgent referral within 2 weeks",
-    4: "emergency referral within 48 hours"
+    0: "annual eye check-up",
+    1: "re-check in 6 months",
+    2: "visit an eye specialist at the district hospital within 2 to 4 weeks",
+    3: "visit an eye specialist urgently within 1 to 2 weeks",
+    4: "go to a specialist hospital within 48 hours"
 }
 
 def generate_recommendation(dr_grade, dme_present, risk_stratification, language, patient_context):
@@ -36,7 +36,10 @@ def generate_recommendation(dr_grade, dme_present, risk_stratification, language
     prompt = (
         "You are a medical AI assistant for rural health workers in India.\n"
         f"Write a short recommendation in {lang_name} only.\n"
-        "Rules: only the target language, under 80 words, simple words, no jargon.\n\n"
+        "Rules: only the target language, under 80 words, simple words, no jargon. "
+        "Use a plain, calm, reassuring tone a health worker can read aloud to a patient. "
+        "State the timeframe clearly but do not use alarming phrases like "
+        "'do not delay', 'follow up quickly', or 'emergency'.\n\n"
         f"DR Grade: {dr_grade} ({grade_label})\n"
         f"DME: {'Present - urgent attention needed' if dme_present else 'Absent'}\n"
         f"Risk: {risk_stratification}\n"
