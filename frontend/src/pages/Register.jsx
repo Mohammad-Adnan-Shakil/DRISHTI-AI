@@ -319,54 +319,8 @@ export default function Register() {
                     </div>
                     <p className="text-[11px] text-[#66756D] mt-1">First-degree relatives diagnosed</p>
                   </div>
-                </div>
-              </div>
 
-              {/* SECTION C: Care Context */}
-              <div className="space-y-5 pb-6 border-b border-[#E2E7E3]">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#E6F4EA] text-[#047857] flex items-center justify-center shrink-0 shadow-2xs"><Globe className="w-4 h-4" /></div>
-                  <div>
-                    <h2 className="font-heading font-bold text-base text-[#20312A] tracking-tight">C. Care Context</h2>
-                    <p className="text-xs text-[#66756D]">Language & screening unit</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-1">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="preferredLanguage">Preferred Language <span className="text-rose-600 font-bold">*</span></label>
-                    <select id="preferredLanguage" value={formData.preferredLanguage} onChange={(e) => handleInputChange('preferredLanguage', e.target.value)}
-                      className={`touch-target w-full h-11 rounded-xl border px-3.5 pr-10 text-sm text-[#20312A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] appearance-none cursor-pointer transition-all ${errors.preferredLanguage ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E2E7E3] bg-white'}`}>
-                      <option value="" disabled>Select language</option>
-                      <option value="Kannada">ಕನ್ನಡ (Kannada)</option>
-                      <option value="Hindi">हिंदी (Hindi)</option>
-                      <option value="Tamil">தமிழ் (Tamil)</option>
-                      <option value="Telugu">తెలుగు (Telugu)</option>
-                      <option value="Marathi">मराठी (MR)</option>
-                      <option value="English">English</option>
-                    </select>
-                    {errors.preferredLanguage && <div className="text-xs text-[#DC2626] mt-1.5 flex items-center gap-1 font-medium"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /><span>{errors.preferredLanguage}</span></div>}
-                    <p className="text-[11px] text-[#66756D] mt-1">Used for printed screening reports and voice prompts</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="phcId">Primary Health Centre (PHC ID)</label>
-                    <input id="phcId" type="text" readOnly value={formData.phcId}
-                      className="touch-target w-full h-11 rounded-xl border border-[#E2E7E3] bg-[#F8FAF7] px-3.5 text-sm font-semibold text-[#20312A] cursor-not-allowed select-all" />
-                    <p className="text-[11px] text-[#66756D] mt-1">Locked to logged-in screening unit</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION D: Risk Score */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#E6F4EA] text-[#047857] flex items-center justify-center shrink-0 shadow-2xs"><ShieldAlert className="w-4 h-4" /></div>
-                  <div>
-                    <h2 className="font-heading font-bold text-base text-[#20312A] tracking-tight">D. Risk Score</h2>
-                    <p className="text-xs text-[#66756D]">Weighted clinical risk profile (max 18 points) — optional, refines triage before screening</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-1">
+                  {/* Risk Score fields — weighted clinical risk profile (max 18 points) */}
                   {RISK_SCORE_FIELDS.map(field => (
                     <div key={field.key}>
                       <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor={field.key}>{field.label}</label>
@@ -401,6 +355,40 @@ export default function Register() {
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border bg-white/60">
                     {riskTierLabel}
                   </span>
+                </div>
+              </div>
+
+              {/* SECTION C: Care Context */}
+              <div className="space-y-5 pb-6 border-b border-[#E2E7E3]">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-[#E6F4EA] text-[#047857] flex items-center justify-center shrink-0 shadow-2xs"><Globe className="w-4 h-4" /></div>
+                  <div>
+                    <h2 className="font-heading font-bold text-base text-[#20312A] tracking-tight">C. Care Context</h2>
+                    <p className="text-xs text-[#66756D]">Language & screening unit</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-1">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="preferredLanguage">Preferred Language <span className="text-rose-600 font-bold">*</span></label>
+                    <select id="preferredLanguage" value={formData.preferredLanguage} onChange={(e) => handleInputChange('preferredLanguage', e.target.value)}
+                      className={`touch-target w-full h-11 rounded-xl border px-3.5 pr-10 text-sm text-[#20312A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] appearance-none cursor-pointer transition-all ${errors.preferredLanguage ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E2E7E3] bg-white'}`}>
+                      <option value="" disabled>Select language</option>
+                      <option value="Kannada">ಕನ್ನಡ (Kannada)</option>
+                      <option value="Hindi">हिंदी (Hindi)</option>
+                      <option value="Tamil">தமிழ் (Tamil)</option>
+                      <option value="Telugu">తెలుగు (Telugu)</option>
+                      <option value="Marathi">मराठी (MR)</option>
+                      <option value="English">English</option>
+                    </select>
+                    {errors.preferredLanguage && <div className="text-xs text-[#DC2626] mt-1.5 flex items-center gap-1 font-medium"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /><span>{errors.preferredLanguage}</span></div>}
+                    <p className="text-[11px] text-[#66756D] mt-1">Used for printed screening reports and voice prompts</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="phcId">Primary Health Centre (PHC ID)</label>
+                    <input id="phcId" type="text" readOnly value={formData.phcId}
+                      className="touch-target w-full h-11 rounded-xl border border-[#E2E7E3] bg-[#F8FAF7] px-3.5 text-sm font-semibold text-[#20312A] cursor-not-allowed select-all" />
+                    <p className="text-[11px] text-[#66756D] mt-1">Locked to logged-in screening unit</p>
+                  </div>
                 </div>
               </div>
 
