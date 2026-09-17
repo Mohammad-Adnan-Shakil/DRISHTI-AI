@@ -1,15 +1,16 @@
 // src/lib/api.js
 // DRISHTI-AI — Unified API Service Layer
-// All endpoints hit the local FastAPI backend (LOCAL_URL).
-// RENDER_URL is kept defined but unused — swap an endpoint back to it if
-// the cloud backend needs to be used again.
+// All endpoints hit the backend at API_URL.
 
-const RENDER_URL = 'https://drishti-ai-69kp.onrender.com'
+// Vite replaces VITE_API_URL at build time. Keep this fallback so a clone
+// remains runnable without an environment file.
+const API_URL = (import.meta.env.VITE_API_URL || 'https://matters-minor-attractions-festivals.trycloudflare.com').replace(/\/+$/, '')
 
-// Local FastAPI backend (classify + explain run the ONNX model locally)
-// ⚠️ If testing from a phone/other device on the same WiFi, swap this for
-// your laptop's LAN IP (run `ipconfig` → IPv4 Address), e.g. 'http://192.168.1.5:8000'
-const LOCAL_URL = 'http://localhost:8000'
+export function apiAssetUrl(path) {
+  if (!path) return null
+  if (/^https?:\/\//i.test(path)) return path
+  return `${API_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
 
 // ─────────────────────────────────────────────
 // HELPERS
@@ -50,7 +51,7 @@ async function get(baseUrl, path) {
 export async function qualityCheck(imageFile) {
   const form = new FormData()
   form.append('file', imageFile)
-  return post(LOCAL_URL, '/api/quality-check', form, true)
+  return post(API_URL, '/api/quality-check', form, true)
 }
 
 /**
@@ -61,7 +62,7 @@ export async function qualityCheck(imageFile) {
 export async function classify(imageFile) {
   const form = new FormData()
   form.append('file', imageFile)
-  return post(LOCAL_URL, '/api/classify', form, true)
+  return post(API_URL, '/api/classify', form, true)
 }
 
 /**
@@ -74,7 +75,7 @@ export async function explain(imageFile, grade = null) {
   const form = new FormData()
   form.append('file', imageFile)
   if (grade !== null) form.append('grade', grade)
-  return post(LOCAL_URL, '/api/explain', form, true)
+  return post(API_URL, '/api/explain', form, true)
 }
 
 /**
@@ -83,7 +84,7 @@ export async function explain(imageFile, grade = null) {
  * @returns {{ recommendation, language }}
  */
 export async function recommend(payload) {
-  return post(LOCAL_URL, '/api/recommend', payload)
+  return post(API_URL, '/api/recommend', payload)
 }
 
 // ─────────────────────────────────────────────
@@ -97,7 +98,7 @@ export async function recommend(payload) {
  * @returns {{ id, name, ... }}
  */
 export async function createPatient(payload) {
-  return post(LOCAL_URL, '/api/patient', payload)
+  return post(API_URL, '/api/patient', payload)
 }
 
 /**
@@ -105,7 +106,7 @@ export async function createPatient(payload) {
  * @param {string} patientId
  */
 export async function getPatient(patientId) {
-  return get(LOCAL_URL, `/api/patient/${patientId}`)
+  return get(API_URL, `/api/patient/${patientId}`)
 }
 
 /**
@@ -113,7 +114,7 @@ export async function getPatient(patientId) {
  * @param {string} patientId
  */
 export async function getPatientRisk(patientId) {
-  return get(LOCAL_URL, `/api/patient/${patientId}/risk`)
+  return get(API_URL, `/api/patient/${patientId}/risk`)
 }
 
 /**
@@ -121,7 +122,7 @@ export async function getPatientRisk(patientId) {
  * @param {string} patientId
  */
 export async function getPatientHistory(patientId) {
-  return get(LOCAL_URL, `/api/patient/${patientId}/history`)
+  return get(API_URL, `/api/patient/${patientId}/history`)
 }
 
 // ─────────────────────────────────────────────
@@ -135,14 +136,14 @@ export async function getPatientHistory(patientId) {
  *           recommendation_text, recommendation_language }} payload
  */
 export async function saveScreening(payload) {
-  return post(LOCAL_URL, '/api/screening', payload)
+  return post(API_URL, '/api/screening', payload)
 }
 
 /**
  * GET /api/screenings/pending
  */
 export async function getPendingScreenings() {
-  return get(LOCAL_URL, '/api/screenings/pending')
+  return get(API_URL, '/api/screenings/pending')
 }
 
 /**
@@ -155,7 +156,7 @@ export async function getPendingScreenings() {
  * @returns {{ patient_id, reviewed_count }}
  */
 export async function markPatientScreeningsReviewed(patientId) {
-  const res = await fetch(`${LOCAL_URL}/api/patient/${patientId}/screenings/review`, {
+  const res = await fetch(`${API_URL}/api/patient/${patientId}/screenings/review`, {
     method: 'PATCH',
   })
   if (!res.ok) {
@@ -171,14 +172,14 @@ export async function markPatientScreeningsReviewed(patientId) {
  * the doctor has already reviewed (reviewed = true).
  */
 export async function getReviewedScreenings() {
-  return get(LOCAL_URL, '/api/screenings/reviewed')
+  return get(API_URL, '/api/screenings/reviewed')
 }
 
 /**
  * GET /api/screenings/stats
  */
 export async function getScreeningStats() {
-  return get(LOCAL_URL, '/api/screenings/stats')
+  return get(API_URL, '/api/screenings/stats')
 }
 
 // ─────────────────────────────────────────────
@@ -186,18 +187,44 @@ export async function getScreeningStats() {
 // ─────────────────────────────────────────────
 
 /**
+ * GET /api/referrals/pending
+ * @returns {Array<{ referral_id, patient_id, patient_name, patient_age, screening_id, status, doctor_notes }>}
+ */
+export async function getPendingReferrals() {
+  return get(API_URL, '/api/referrals/pending')
+}
+
+/**
  * POST /api/referral
  * @param {{ screening_id, patient_id }} payload
  */
 export async function createReferral(payload) {
-  return post(LOCAL_URL, '/api/referral', payload)
+  return post(API_URL, '/api/referral', payload)
+}
+
+/**
+ * PATCH /api/referral/:id
+ * @param {number|string} referralId
+ * @param {{ status: 'pending'|'sent'|'attended'|'no_show' }} payload
+ */
+export async function updateReferral(referralId, payload) {
+  const res = await fetch(`${API_URL}/api/referral/${referralId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`PATCH /api/referral/${referralId} failed [${res.status}]: ${err}`)
+  }
+  return res.json()
 }
 
 /**
  * GET /api/referrals/stats
  */
 export async function getReferralStats() {
-  return get(LOCAL_URL, '/api/referrals/stats')
+  return get(API_URL, '/api/referrals/stats')
 }
 
 // ─────────────────────────────────────────────
@@ -205,9 +232,9 @@ export async function getReferralStats() {
 // ─────────────────────────────────────────────
 
 export async function healthCheck() {
-  return get(LOCAL_URL, '/health')
+  return get(API_URL, '/health')
 }
 
 export async function localHealthCheck() {
-  return get(LOCAL_URL, '/health')
+  return get(API_URL, '/health')
 }
