@@ -16,13 +16,24 @@ export function apiAssetUrl(path) {
 // HELPERS
 // ─────────────────────────────────────────────
 
-async function post(baseUrl, path, body, isFormData = false) {
+async function post(baseUrl, path, body, isFormData = false, timeoutMs = null) {
   const headers = isFormData ? {} : { 'Content-Type': 'application/json' }
-  const res = await fetch(`${baseUrl}${path}`, {
-    method: 'POST',
-    headers,
-    body: isFormData ? body : JSON.stringify(body),
-  })
+  const controller = timeoutMs ? new AbortController() : null
+  const timeoutId = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null
+  let res
+  try {
+    res = await fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers,
+      body: isFormData ? body : JSON.stringify(body),
+      signal: controller?.signal,
+    })
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error(`POST ${path} timed out after ${timeoutMs}ms`)
+    throw err
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
   if (!res.ok) {
     const err = await res.text()
     throw new Error(`POST ${path} failed [${res.status}]: ${err}`)
@@ -45,13 +56,16 @@ async function get(baseUrl, path) {
 
 /**
  * POST /api/quality-check
+ * 30s timeout — mobile networks can be slow, and this check is a
+ * nice-to-have, not a gate: callers should treat a timeout the same as any
+ * other failure and proceed to classify regardless.
  * @param {File} imageFile
  * @returns {{ quality_score, brightness, contrast, sharpness, passed, enhanced_image_path }}
  */
 export async function qualityCheck(imageFile) {
   const form = new FormData()
   form.append('file', imageFile)
-  return post(API_URL, '/api/quality-check', form, true)
+  return post(API_URL, '/api/quality-check', form, true, 30000)
 }
 
 /**

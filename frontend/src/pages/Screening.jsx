@@ -32,8 +32,11 @@ import {
   explain,
   recommend,
   saveScreening,
-  getPatient
+  createReferral,
+  getPatient,
+  apiAssetUrl
 } from '../lib/api'
+import { getPendingQueue, queueScreening } from '../lib/db'
 
 // Mock Patient Database
 const PATIENTS = {
@@ -215,6 +218,9 @@ export default function Screening() {
 
   // Save/referral submission state — guards against double-submit
   const [isSaving, setIsSaving] = useState(false)
+  const [savedScreeningId, setSavedScreeningId] = useState(null)
+  const [saveSuccess, setSaveSuccess] = useState(null)
+  const [offlineQueueKey, setOfflineQueueKey] = useState(null)
 
   // Screening report PDF export
   const [isExportingReport, setIsExportingReport] = useState(false)
@@ -268,6 +274,18 @@ export default function Screening() {
     return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state])
+
+  useEffect(() => {
+    const handleSyncStatus = (event) => {
+      const { status, offlineKey } = event.detail || {}
+      if (!offlineQueueKey || offlineKey !== offlineQueueKey) return
+      if (status === 'syncing') setSaveSuccess('Syncing offline screening...')
+      if (status === 'synced') setSaveSuccess('Offline screening synced successfully.')
+      if (status === 'failed') setSaveSuccess('Offline screening is still waiting to sync.')
+    }
+    window.addEventListener('drishti:offline-sync', handleSyncStatus)
+    return () => window.removeEventListener('drishti:offline-sync', handleSyncStatus)
+  }, [offlineQueueKey])
 
   const selectedPatient = apiPatients[selectedPatientId] || PATIENTS[selectedPatientId] || PATIENTS['DRI-2026-00421']
 
@@ -332,18 +350,25 @@ export default function Screening() {
 
     try {
       const result = await qualityCheck(imageFile)
-      setQualityScore(result.quality_score ?? 92)
+      setQualityScore(result.quality_score ?? null)
+      if (result.quality_score == null) {
+        setQualityError('Quality check returned no score. Please retry the image check.')
+      }
       if (result.passed === false) {
         setIsQualityRejected(true)
       } else {
         setIsQualityRejected(false)
       }
-    } catch (err) {
-      console.error('Quality check failed:', err)
-      setQualityError('Quality check unavailable — proceeding with manual review.')
-      setIsQualityRejected(false)
-    } finally {
       setQualityLoading(false)
+    } catch (err) {
+      // Quality-check is a nice-to-have, not a gate — if it times out (e.g.
+      // slow mobile networks) or errors, skip straight to AI analysis
+      // instead of stranding the user on a "quality check unavailable"
+      // screen they'd have to manually click past.
+      console.error('Quality check failed or timed out — skipping to AI analysis:', err)
+      setQualityLoading(false)
+      setIsQualityRejected(false)
+      startAIAnalysis(imageFile)
     }
   }
 
@@ -354,7 +379,12 @@ export default function Screening() {
   }
 
   // AI Pipeline — real API calls
-  const startAIAnalysis = async () => {
+  // fileOverride lets the quality-check failure path hand off the just-picked
+  // file directly, since uploadedFile's state update may not have flushed
+  // yet. Button onClick handlers call this with no args (or a click event,
+  // which isn't a File and is ignored), so they still fall back to state.
+  const startAIAnalysis = async (fileOverride) => {
+    const activeFile = fileOverride instanceof File ? fileOverride : uploadedFile
     setScreeningStep('processing')
     setIsAnalyzing(true)
     setPipelineStage(1)
@@ -368,8 +398,8 @@ export default function Screening() {
 
       // Stage 3: classify
       let gradeResult = null
-      if (uploadedFile) {
-        gradeResult = await classify(uploadedFile)
+      if (activeFile) {
+        gradeResult = await classify(activeFile)
         setAiResult(gradeResult)
         setSimulatedGrade(gradeResult.grade)
         setFundusImageUrl(gradeResult.fundus_image_url)
@@ -377,12 +407,15 @@ export default function Screening() {
       setPipelineStage(3); setAnalysisProgress(60)
 
       // Stage 4: Grad-CAM explain
-      if (uploadedFile) {
+      if (activeFile) {
         try {
-          const explainResult = await explain(uploadedFile, gradeResult?.grade ?? null)
+          const explainResult = await explain(activeFile, gradeResult?.grade ?? null)
           setHeatmapUrl(explainResult.heatmap_url)
-        } catch {
-          // explain failure is non-fatal
+        } catch (err) {
+          console.error('Explanation failed:', err)
+          setApiError('AI explanation is unavailable. Please retry the analysis.')
+          setIsAnalyzing(false)
+          return
         }
       }
       setPipelineStage(4); setAnalysisProgress(82)
@@ -406,8 +439,11 @@ export default function Screening() {
           }
         })
         setRecommendationText(rec.recommendation)
-      } catch {
-        // recommendation failure is non-fatal
+      } catch (err) {
+        console.error('Recommendation failed:', err)
+        setApiError('Recommendation is unavailable. Please retry the analysis.')
+        setIsAnalyzing(false)
+        return
       }
 
       setPipelineStage(5); setAnalysisProgress(100)
@@ -417,10 +453,9 @@ export default function Screening() {
 
     } catch (err) {
       console.error('AI analysis failed:', err)
-      setApiError('AI classify failed. Using demo mode — showing simulated results.')
+      setApiError('AI analysis failed. Please retry the analysis.')
       setIsAnalyzing(false)
-      setPipelineStage(5); setAnalysisProgress(100)
-      setTimeout(() => setScreeningStep('results'), 800)
+      setPipelineStage(3); setAnalysisProgress(60)
     }
   }
 
@@ -428,34 +463,111 @@ export default function Screening() {
   const handleSaveScreening = async () => {
     if (isSaving) return // already submitting — ignore repeat clicks
     setIsSaving(true)
+    setApiError(null)
+    setSaveSuccess(null)
 
     if (!selectedPatient.realId) {
       // Demo patient (not backed by a real DB row) — nothing valid to save against.
       console.warn('Skipping saveScreening: no real patient_id for demo patient', selectedPatientId)
-      navigate(gradeInfo.primaryActionRoute)
+      if (activeGrade < 2) {
+        navigate(gradeInfo.primaryActionRoute)
+        return
+      }
+      setApiError('Select a registered patient before saving this screening.')
+      setIsSaving(false)
+      return
+    }
+
+    let screeningId = savedScreeningId
+    const screeningPayload = {
+      patient_id: selectedPatient.realId,
+      dr_grade: activeGrade,
+      dr_confidence: activeConfidence,
+      quality_score: qualityScore,
+      fundus_image_url: fundusImageUrl ?? '',
+      heatmap_url: heatmapUrl ?? '',
+      risk_stratification: gradeInfo.risk,
+      referral_recommended: activeGrade >= 2,
+      recommendation_text: recommendationText ?? gradeInfo.recommendation,
+      recommendation_language: 'English'
+    }
+    const offlineKey = [
+      selectedPatient.realId,
+      activeEye,
+      fundusImageUrl || uploadedFile?.name || 'screening',
+      activeGrade,
+    ].join(':')
+
+    const queueOffline = async () => {
+      const pending = await getPendingQueue()
+      const existing = pending.find(item => item.offline_key === offlineKey)
+      if (existing) {
+        setOfflineQueueKey(offlineKey)
+        setSaveSuccess('Screening saved offline. Waiting for connection.')
+        setIsSaving(false)
+        return
+      }
+      await queueScreening({
+        ...screeningPayload,
+        offline_key: offlineKey,
+        remote_screening_id: screeningId,
+        referral_intent: activeGrade >= 2,
+        referral_patient_id: selectedPatient.realId,
+      })
+      setOfflineQueueKey(offlineKey)
+      setSaveSuccess('Screening saved offline. Waiting for connection.')
+      setIsSaving(false)
+    }
+
+    if (!navigator.onLine) {
+      try {
+        await queueOffline()
+      } catch (err) {
+        console.error('Offline screening queue failed:', err)
+        setApiError('Could not save screening offline. Please try again.')
+        setIsSaving(false)
+      }
       return
     }
 
     try {
-      await saveScreening({
-        patient_id: selectedPatient.realId,
-        dr_grade: activeGrade,
-        dr_confidence: activeConfidence,
-        quality_score: qualityScore,
-        fundus_image_url: fundusImageUrl ?? '',
-        heatmap_url: heatmapUrl ?? '',
-        risk_stratification: gradeInfo.risk,
-        referral_recommended: activeGrade >= 2,
-        recommendation_text: recommendationText ?? gradeInfo.recommendation,
-        recommendation_language: 'English'
-      })
+      if (!screeningId) {
+        const screening = await saveScreening(screeningPayload)
+        screeningId = screening?.id
+        if (activeGrade >= 2 && !screeningId) {
+          throw new Error('Screening saved without an ID')
+        }
+        setSavedScreeningId(screeningId)
+      }
+
+      if (activeGrade >= 2) {
+        await createReferral({
+          screening_id: screeningId,
+          patient_id: selectedPatient.realId
+        })
+        setSaveSuccess(`Screening ${screeningId} and referral saved successfully.`)
+        setTimeout(() => navigate(gradeInfo.primaryActionRoute), 800)
+        return
+      }
+
+      navigate(gradeInfo.primaryActionRoute)
     } catch (err) {
-      console.error('Save screening failed:', err)
-      // Non-fatal — navigate anyway
+      console.error('Save screening/referral failed:', err)
+      if (err instanceof TypeError) {
+        try {
+          await queueOffline()
+        } catch (queueError) {
+          console.error('Offline screening queue failed:', queueError)
+          setApiError('Connection failed and the screening could not be saved offline. Please try again.')
+          setIsSaving(false)
+        }
+        return
+      }
+      setApiError(screeningId
+        ? `Screening ${screeningId} was saved, but referral creation failed. You can retry the referral.`
+        : 'Could not save screening. Please try again.')
+      setIsSaving(false)
     }
-    navigate(gradeInfo.primaryActionRoute)
-    // Not resetting isSaving — the page navigates away, so the button stays
-    // disabled until this component unmounts.
   }
 
   // Export the current screening result as a single-visit A4 PDF report
@@ -524,9 +636,18 @@ export default function Screening() {
 
         {/* API Error Banner */}
         {apiError && (
-          <div className="warning-banner p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+          <div role="alert" className="warning-banner p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center gap-3">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>{apiError}</span>
+            <span className="flex-1">{apiError}</span>
+            {uploadedFile && !isSaving && (
+              <button type="button" onClick={startAIAnalysis} className="font-semibold underline">Retry</button>
+            )}
+          </div>
+        )}
+        {saveSuccess && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{saveSuccess}</span>
           </div>
         )}
 
@@ -785,13 +906,13 @@ export default function Screening() {
                   {/* Show real heatmap if available and gradcam layer selected */}
                   {activeLayer === 'gradcam' && heatmapUrl ? (
                     <img
-                      src={`http://localhost:8000${heatmapUrl}`}
+                      src={apiAssetUrl(heatmapUrl)}
                       alt="Grad-CAM Heatmap"
                       className="w-full h-full object-contain"
                     />
                   ) : (activeLayer === 'original' || activeLayer === 'vessel' || activeLayer === 'compare') && fundusImageUrl ? (
                     <img
-                      src={`http://localhost:8000${fundusImageUrl}`}
+                      src={apiAssetUrl(fundusImageUrl)}
                       alt="Fundus Photo"
                       className="w-full h-full object-contain"
                     />
@@ -1151,7 +1272,7 @@ export default function Screening() {
           activeConfidence={activeConfidence}
           activeEye={activeEye}
           gradeInfo={gradeInfo}
-          gradcamUrl={heatmapUrl ? `http://localhost:8000${heatmapUrl}` : null}
+          gradcamUrl={apiAssetUrl(heatmapUrl)}
           recommendationText={recommendationText}
           qualityScore={qualityScore}
         />
