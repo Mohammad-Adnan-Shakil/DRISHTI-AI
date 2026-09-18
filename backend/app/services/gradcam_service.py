@@ -1,10 +1,8 @@
 from datetime import datetime
 from pathlib import Path
 
-import cv2
 import numpy as np
 from PIL import Image
-from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from app.services.model_service import classifier
 
@@ -12,7 +10,7 @@ HEATMAP_DIR = Path("static/screenings/gradcam")
 HEATMAP_DIR.mkdir(parents=True, exist_ok=True)
 
 INPUT_SIZE = 380
-PATCH_SIZE = 76  # 5x5 occlusion grid — each cell costs one ONNX forward pass
+PATCH_SIZE = 76
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
@@ -25,35 +23,32 @@ def _predict_probs(session, tensor: np.ndarray) -> np.ndarray:
     return _softmax(logits)
 
 
-def generate_gradcam(image_path: str, target_grade: int = None) -> dict:
-    """
-    Occlusion-sensitivity explanation map for the ONNX DR classifier.
+def show_cam_on_image(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    # Jet colormap via numpy (replaces cv2.applyColorMap)
+    mask_clipped = np.clip(mask, 0, 1)
+    r = np.clip(1.5 - np.abs(4 * mask_clipped - 3), 0, 1)
+    g = np.clip(1.5 - np.abs(4 * mask_clipped - 2), 0, 1)
+    b = np.clip(1.5 - np.abs(4 * mask_clipped - 1), 0, 1)
+    heatmap = np.stack([r, g, b], axis=2).astype(np.float32)
+    overlay = heatmap + 0.5 * image
+    overlay = overlay / np.max(overlay)
+    return (overlay * 255).astype(np.uint8)
 
-    True Grad-CAM needs gradients of the target class w.r.t. a conv layer's
-    activations, which requires backprop through a live PyTorch module. The
-    deployed classifier is an inference-only ONNX Runtime session (no
-    autograd graph, no .model, no logits object to call .backward() on), so
-    gradients aren't available. Occlusion sensitivity produces the same kind
-    of signal — "which regions matter to the prediction" — using only
-    forward passes: blank out each region of the image, re-run inference,
-    and measure how much the target grade's confidence drops. A bigger drop
-    means that region mattered more.
-    """
-    pil_img = Image.open(image_path).convert("RGB").resize((INPUT_SIZE, INPUT_SIZE))
+
+def generate_gradcam(image_path: str, target_grade: int = None) -> dict:
+    pil_img = Image.open(image_path).convert("RGB").resize((INPUT_SIZE, INPUT_SIZE), Image.BILINEAR)
     rgb_img = np.array(pil_img, dtype=np.float32) / 255.0
 
     session = classifier.session
-    base_tensor = classifier.transform(pil_img).unsqueeze(0).numpy()
+    base_tensor = classifier.preprocess(pil_img)
 
     baseline_probs = _predict_probs(session, base_tensor)
     if target_grade is None:
         target_grade = int(np.argmax(baseline_probs))
     baseline_score = baseline_probs[target_grade]
 
-    # Mid-gray occlusion patch, expressed in the model's normalized input
-    # space (same ImageNet mean/std used by classifier.transform).
     mean = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
-    std = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
+    std  = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
     gray_value = ((0.5 - mean) / std).astype(np.float32)
 
     grid_size = INPUT_SIZE // PATCH_SIZE
@@ -71,17 +66,19 @@ def generate_gradcam(image_path: str, target_grade: int = None) -> dict:
     if saliency.max() > 0:
         saliency = saliency / saliency.max()
 
-    grayscale_cam = cv2.resize(saliency, (INPUT_SIZE, INPUT_SIZE), interpolation=cv2.INTER_CUBIC)
-    grayscale_cam = np.clip(grayscale_cam, 0, 1).astype(np.float32)
+    # Resize saliency map with Pillow (replaces cv2.resize)
+    saliency_pil = Image.fromarray((saliency * 255).astype(np.uint8)).resize(
+        (INPUT_SIZE, INPUT_SIZE), Image.BICUBIC
+    )
+    grayscale_cam = np.array(saliency_pil, dtype=np.float32) / 255.0
+    grayscale_cam = np.clip(grayscale_cam, 0, 1)
 
-    # Generate heatmap overlay
-    cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+    cam_image = show_cam_on_image(rgb_img, grayscale_cam)
 
-    # Save heatmap
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
     heatmap_filename = f"{timestamp}_gradcam.jpg"
     heatmap_path = str(HEATMAP_DIR / heatmap_filename)
-    cv2.imwrite(heatmap_path, cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR))
+    Image.fromarray(cam_image).save(heatmap_path, quality=95)
 
     return {
         "heatmap_path": heatmap_path,
