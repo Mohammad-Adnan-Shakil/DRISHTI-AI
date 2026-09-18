@@ -2,20 +2,39 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import classify, explain, recommend, patient, screening, referral, quality
+from app.core.database import engine
 from app.core.config import settings
+from app.services.model_service import classifier
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from datetime import datetime, timedelta, timezone
 
 # Ensure static storage directories exist before the app starts serving —
 # real fundus photos and Grad-CAM heatmaps are written here.
-Path("static/screenings/fundus").mkdir(parents=True, exist_ok=True)
-Path("static/screenings/gradcam").mkdir(parents=True, exist_ok=True)
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+Path(STATIC_DIR / "screenings/fundus").mkdir(parents=True, exist_ok=True)
+Path(STATIC_DIR / "screenings/gradcam").mkdir(parents=True, exist_ok=True)
+
+
+def cleanup_staging_files(max_age_hours: int = 24):
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    for directory in (STATIC_DIR / "temp", STATIC_DIR / "uploads"):
+        directory.mkdir(parents=True, exist_ok=True)
+        for path in directory.iterdir():
+            if path.is_file() and datetime.fromtimestamp(
+                path.stat().st_mtime, timezone.utc
+            ) < cutoff:
+                path.unlink()
+
+
+cleanup_staging_files()
 
 app = FastAPI(title="DRISHTI-AI", version="1.0.0")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -28,6 +47,22 @@ app.include_router(patient.router, prefix="/api")
 app.include_router(screening.router, prefix="/api")
 app.include_router(referral.router, prefix="/api")
 
+@app.on_event("startup")
+async def startup():
+    pass
+
+
 @app.get("/health")
-def health():
-    return {"status": "ok", "model": settings.MODEL_PATH}
+async def health():
+    database = {"available": True, "error": None}
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+    except Exception as exc:
+        database = {"available": False, "error": type(exc).__name__}
+
+    model = classifier.status()
+    if not model["available"]:
+        model["error"] = model["error"] or "ONNX model files are missing"
+    status = "ok" if database["available"] and model["loaded"] else "degraded"
+    return {"status": status, "database": database, "model": model}
