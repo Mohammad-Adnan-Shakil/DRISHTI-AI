@@ -13,8 +13,8 @@
 
 </div>
 
-> **🏆 Selected for Smart India Hackathon 2026 Grand Finale**
-> Grand Finale: Sep 25-26, 2026 · Submission deadline: Sep 30, 2026
+> **🏥 Cleared Smart India Hackathon 2026 — College Internal Round**
+> PPT submission deadline: Sep 30, 2026 · Targeting Grand Finale selection
 > Frontend live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app) · Backend deployment in progress
 
 ---
