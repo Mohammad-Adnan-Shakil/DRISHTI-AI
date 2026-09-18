@@ -1,7 +1,21 @@
-# DRISHTI-AI
-### Explainable AI for Diabetic Retinopathy Screening in Rural India
-**SIH 2026 | Problem Statement: SIH26038 | Organization: MathWorks**
-**Theme: MedTech / BioTech / HealthTech**
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=1a0000,8B0000,DC143C&height=200&section=header&text=DRISHTI-AI&fontSize=52&fontColor=ffffff&fontAlignY=38&desc=Explainable%20AI%20for%20Diabetic%20Retinopathy%20Screening%20in%20Rural%20India&descAlignY=60&descSize=16&animation=fadeIn"/>
+
+</div>
+
+<div align="center">
+
+![SIH](https://img.shields.io/badge/SIH_2026-Grand_Finale-DC143C?style=for-the-badge)
+![Problem](https://img.shields.io/badge/SIH26038-MathWorks-8B0000?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Active_Build-success?style=for-the-badge)
+![Live](https://img.shields.io/badge/Live-drishti--ai--ruddy.vercel.app-111111?style=for-the-badge&logo=vercel)
+
+</div>
+
+> **🏆 Selected for Smart India Hackathon 2026 Grand Finale**
+> Grand Finale: Sep 25-26, 2026 · Submission deadline: Sep 30, 2026
+> Frontend live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app) · Backend deployment in progress
 
 ---
 
@@ -62,49 +76,10 @@ tool that works offline, explains its decisions, and routes patients to care aut
 - **PWA + Service Worker + IndexedDB** — offline-first, auto-sync when connection restored
 
 ### Deployment
-- Backend → Render
-- Frontend → Vercel
-- Model weights → HuggingFace Hub (adnshkl/drishti-efficientnet-b4-dr)
+- Backend → Render *(deployment in progress — 900MB ONNX model via Cloudflare R2)*
+- Frontend → Vercel ✅ Live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app)
+- Model weights → HuggingFace Hub (`adnshkl/drishti-efficientnet-b4-dr`)
 
 ---
 
 ## Repository Structure
-
-DRISHTI-AI/
-├── backend/ # FastAPI REST API
-│ ├── app/
-│ │ ├── api/ # Route handlers
-│ │ ├── core/ # Config, DB connection
-│ │ ├── models/ # SQLAlchemy models
-│ │ └── services/ # ML, MATLAB, LLM, risk engine
-│ └── main.py
-├── ml/
-│ ├── matlab/ # MATLAB scripts (CLAHE, quality, segmentation)
-│ ├── simulink/ # Simulink pipeline model + Stateflow referral FSM
-│ └── models/ # Trained model weights (.pth)
-├── frontend/ # React PWA (doctor dashboard + health worker UI)
-└── docs/ # Architecture diagrams, API spec
-
-
----
-
-## Model Performance
-
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| Sensitivity (Grade 2+) | 91-94% | **92.8%** |
-| Specificity | > 85% | **93.6%** |
-| Processing time | < 5 seconds/image | **~2 seconds** |
-| Report generation | < 30 seconds | — |
-| Languages supported | 6 | **6** |
-
----
-
-## Team
-
-**Presidency University, Bengaluru — Batch 2024-2028**
-
-| Role | Scope |
-|------|-------|
-| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, risk engine, PWA offline logic |
-| Frontend | React PWA, doctor dashboard, health worker UI |
