@@ -4,7 +4,7 @@
 
 // Vite replaces VITE_API_URL at build time. Keep this fallback so a clone
 // remains runnable without an environment file.
-const API_URL = (import.meta.env.VITE_API_URL || 'https://swap-disabled-stamps-buyers.trycloudflare.com').replace(/\/+$/, '')
+const API_URL = (import.meta.env.VITE_API_URL || 'https://drishti-ai-mj1b.onrender.com').replace(/\/+$/, '')
 
 export function apiAssetUrl(path) {
   if (!path) return null
