@@ -1,0 +1,15 @@
+{
+  "appId": "com.drishti.ai",
+  "appName": "DRISHTI",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#285943",
+      "showSpinner": false
+    }
+  }
+}

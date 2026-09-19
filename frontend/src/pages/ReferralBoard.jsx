@@ -41,7 +41,7 @@ function DirectionsButton({ phcId }) {
   const query = encodeURIComponent(`ophthalmology eye hospital near ${phcId || 'Bengaluru'} Karnataka India`)
   const url = `https://www.google.com/maps/search/${query}`
   return (
-    
+    <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
