@@ -85,3 +85,62 @@ tool that works offline, explains its decisions, and routes patients to care aut
 ---
 
 ## Repository Structure
+
+DRISHTI-AI/
+├── backend/ # FastAPI REST API
+│ ├── app/
+│ │ ├── api/ # Route handlers
+│ │ ├── core/ # Config, DB connection
+│ │ ├── models/ # SQLAlchemy models
+│ │ └── services/ # ML, MATLAB, LLM, risk engine
+│ └── main.py
+├── ml/
+│ ├── matlab/ # MATLAB scripts (CLAHE, quality, segmentation)
+│ ├── simulink/ # Simulink pipeline model + Stateflow referral FSM
+│ └── models/ # Trained model weights
+├── frontend/ # React PWA (doctor dashboard + health worker UI)
+│ └── android/ # Capacitor Android project
+└── docs/ # Architecture diagrams, API spec
+
+
+---
+
+## Model Performance
+
+| Metric | Target | Achieved |
+|--------|--------|----------|
+| Sensitivity (Grade 2+) | 91-94% | **92.8%** |
+| Specificity | > 85% | **93.6%** |
+| Processing time | < 5 seconds/image | **~2 seconds** |
+| Report generation | < 30 seconds | — |
+| Languages supported | 6 | **6** |
+
+---
+
+## Achievements
+
+| Recognition | Details |
+|---|---|
+| 🏥 SIH 2026 | Cleared college internal round — SIH26038 · MathWorks · PPT submission Sep 30 |
+
+---
+
+## Team
+
+**Presidency University, Bengaluru — Batch 2024-2028**
+
+| Role | Scope |
+|------|-------|
+| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, risk engine, PWA offline logic |
+| Frontend | React PWA, doctor dashboard, health worker UI |
+
+---
+
+<div align="center">
+
+[![GitHub](https://img.shields.io/badge/Mohammad--Adnan--Shakil-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Mohammad-Adnan-Shakil)
+[![LinkedIn](https://img.shields.io/badge/mohammadadnanshakil-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/mohammadadnanshakil)
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=000000,8B0000,DC143C&height=120&section=footer"/>
+
+</div>
