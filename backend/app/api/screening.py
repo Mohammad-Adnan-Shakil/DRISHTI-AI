@@ -5,6 +5,7 @@ from sqlalchemy import select, func
 from pydantic import BaseModel
 from typing import Optional
 from app.core.database import get_db
+from app.api.auth import verify_token, TokenData
 from app.models.screening import Screening
 from app.models.patient import Patient
 
@@ -45,7 +46,7 @@ class ScreeningResponse(BaseModel):
         from_attributes = True
 
 @router.post("/screening", response_model=ScreeningResponse)
-async def save_screening(data: ScreeningCreate, db: AsyncSession = Depends(get_db)):
+async def save_screening(data: ScreeningCreate, db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     result = await db.execute(select(Patient).where(Patient.id == data.patient_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -56,12 +57,12 @@ async def save_screening(data: ScreeningCreate, db: AsyncSession = Depends(get_d
     return screening
 
 @router.patch("/patient/{patient_id}/screenings/review")
-async def mark_patient_screenings_reviewed(patient_id: int, db: AsyncSession = Depends(get_db)):
+async def mark_patient_screenings_reviewed(patient_id: int, db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     """
     Called when a doctor confirms/submits their review on the Doctor Review
     page. Marks every pending (referral-recommended, not yet reviewed)
     screening for this patient as reviewed, so they drop out of
-    /screenings/pending — the doctor's queue no longer shows them.
+    /screenings/pending � the doctor's queue no longer shows them.
     """
     result = await db.execute(
         select(Screening).where(
@@ -81,7 +82,7 @@ async def mark_patient_screenings_reviewed(patient_id: int, db: AsyncSession = D
     return {"patient_id": patient_id, "reviewed_count": len(screenings)}
 
 @router.get("/screenings/pending")
-async def get_pending_screenings(db: AsyncSession = Depends(get_db)):
+async def get_pending_screenings(db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     result = await db.execute(
         select(Screening, Patient)
         .join(Patient, Screening.patient_id == Patient.id)
@@ -110,7 +111,7 @@ async def get_pending_screenings(db: AsyncSession = Depends(get_db)):
     ]
 
 @router.get("/screenings/reviewed")
-async def get_reviewed_screenings(db: AsyncSession = Depends(get_db)):
+async def get_reviewed_screenings(db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     result = await db.execute(
         select(Screening, Patient)
         .join(Patient, Screening.patient_id == Patient.id)
@@ -139,7 +140,7 @@ async def get_reviewed_screenings(db: AsyncSession = Depends(get_db)):
     ]
 
 @router.get("/screenings/stats")
-async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
+async def get_dashboard_stats(db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     total = await db.execute(select(func.count(Screening.id)))
     referrals = await db.execute(
         select(func.count(Screening.id)).where(Screening.referral_recommended == True)
@@ -183,39 +184,13 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     }
 
 @router.get("/screening/{screening_id}", response_model=ScreeningResponse)
-async def get_screening(screening_id: int, db: AsyncSession = Depends(get_db)):
+async def get_screening(screening_id: int, db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     result = await db.execute(select(Screening).where(Screening.id == screening_id))
     screening = result.scalar_one_or_none()
     if not screening:
         raise HTTPException(status_code=404, detail="Screening not found")
     return screening
 
-@router.get("/patient/{patient_id}/history")
-async def get_history(patient_id: int, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Screening)
-        .where(Screening.patient_id == patient_id)
-        .order_by(Screening.created_at.desc())
-    )
-    screenings = result.scalars().all()
-    return [
-        {
-            "id": s.id,
-            "patient_id": s.patient_id,
-            "dr_grade": s.dr_grade,
-            "dr_confidence": s.dr_confidence,
-            "dme_present": s.dme_present,
-            "dme_confidence": s.dme_confidence,
-            "quality_score": s.quality_score,
-            "fundus_image_url": s.fundus_image_url,
-            "heatmap_url": s.heatmap_url,
-            "vessel_map_url": s.vessel_map_url,
-            "risk_stratification": s.risk_stratification,
-            "referral_recommended": s.referral_recommended,
-            "reviewed": s.reviewed,
-            "recommendation_text": s.recommendation_text,
-            "recommendation_language": s.recommendation_language,
-            "created_at": s.created_at.isoformat() if s.created_at else None
-        }
-        for s in screenings
-    ]
+# Note: GET /patient/{patient_id}/history lives in app/api/patient.py
+
+

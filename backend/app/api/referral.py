@@ -1,9 +1,10 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 from typing import Optional
 from app.core.database import get_db
+from app.api.auth import verify_token, TokenData
 from app.models.referral import Referral
 from app.models.screening import Screening
 from app.models.patient import Patient
@@ -31,7 +32,7 @@ class ReferralResponse(BaseModel):
         from_attributes = True
 
 @router.post("/referral", response_model=ReferralResponse)
-async def create_referral(data: ReferralCreate, db: AsyncSession = Depends(get_db)):
+async def create_referral(data: ReferralCreate, db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     # Verify screening exists
     result = await db.execute(select(Screening).where(Screening.id == data.screening_id))
     if not result.scalar_one_or_none():
@@ -44,7 +45,7 @@ async def create_referral(data: ReferralCreate, db: AsyncSession = Depends(get_d
     return referral
 
 @router.patch("/referral/{referral_id}", response_model=ReferralResponse)
-async def update_referral(referral_id: int, data: ReferralUpdate, db: AsyncSession = Depends(get_db)):
+async def update_referral(referral_id: int, data: ReferralUpdate, db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     result = await db.execute(select(Referral).where(Referral.id == referral_id))
     referral = result.scalar_one_or_none()
     if not referral:
@@ -65,7 +66,7 @@ async def update_referral(referral_id: int, data: ReferralUpdate, db: AsyncSessi
     return referral
 
 @router.get("/referrals/pending")
-async def get_pending_referrals(db: AsyncSession = Depends(get_db)):
+async def get_pending_referrals(db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     result = await db.execute(
         select(Referral, Patient)
         .join(Patient, Referral.patient_id == Patient.id)
@@ -87,7 +88,7 @@ async def get_pending_referrals(db: AsyncSession = Depends(get_db)):
     ]
 
 @router.get("/referrals/stats")
-async def get_referral_stats(db: AsyncSession = Depends(get_db)):
+async def get_referral_stats(db: AsyncSession = Depends(get_db), token: TokenData = Depends(verify_token)):
     from sqlalchemy import func
     total = await db.execute(select(func.count(Referral.id)))
     pending = await db.execute(select(func.count(Referral.id)).where(Referral.status == "pending"))
@@ -99,3 +100,4 @@ async def get_referral_stats(db: AsyncSession = Depends(get_db)):
         "attended": attended.scalar(),
         "no_show": no_show.scalar()
     }
+

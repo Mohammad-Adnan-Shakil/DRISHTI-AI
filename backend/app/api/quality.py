@@ -2,6 +2,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 import shutil, uuid
 from pathlib import Path
 from app.services.matlab_service import run_quality_check
+from fastapi import Depends
+from app.api.auth import verify_token, TokenData
 
 router = APIRouter()
 
@@ -9,7 +11,7 @@ UPLOAD_DIR = Path("static/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("/quality-check")
-async def quality_check(file: UploadFile = File(...)):
+async def quality_check(file: UploadFile = File(...), token: TokenData = Depends(verify_token)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
     

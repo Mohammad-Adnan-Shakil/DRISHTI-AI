@@ -3,6 +3,8 @@ from fastapi.responses import FileResponse
 import shutil, uuid
 from pathlib import Path
 from app.services.gradcam_service import generate_gradcam
+from fastapi import Depends
+from app.api.auth import verify_token, TokenData
 
 router = APIRouter()
 

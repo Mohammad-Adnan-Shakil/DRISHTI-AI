@@ -4,6 +4,8 @@ import io
 from datetime import datetime
 from pathlib import Path
 from app.services.model_service import classifier
+from fastapi import Depends
+from app.api.auth import verify_token, TokenData
 
 router = APIRouter()
 
@@ -11,7 +13,7 @@ FUNDUS_DIR = Path("static/screenings/fundus")
 FUNDUS_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("/classify")
-async def classify_image(file: UploadFile = File(...)):
+async def classify_image(file: UploadFile = File(...), token: TokenData = Depends(verify_token)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
@@ -31,3 +33,4 @@ async def classify_image(file: UploadFile = File(...)):
 
     result["fundus_image_url"] = f"/static/screenings/fundus/{saved_filename}"
     return result
+

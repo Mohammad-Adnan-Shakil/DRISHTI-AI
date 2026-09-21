@@ -1,28 +1,49 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, ChevronDown, ArrowRight, Shield, Users, Stethoscope, BarChart3 } from 'lucide-react'
+import { login, DEMO_ROLES, getRoleHome } from '../lib/auth'
+import { useTranslation } from 'react-i18next'
 
 export default function Login() {
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [language, setLanguage] = useState('en')
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleLogin = (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setTimeout(() => {
-      if (email.includes('doctor') || email.includes('dr.')) {
-        navigate('/doctor-dashboard')
-      } else if (email.includes('admin')) {
-        navigate('/analytics')
-      } else {
-        navigate('/dashboard')
-      }
-    }, 350)
+
+  const handleLogin = async (e) => {
+  e.preventDefault()
+  setIsLoading(true)
+  try {
+    const data = await login(email, password)
+    const requestedPath = location.state?.from
+    navigate(requestedPath || getRoleHome(data.role), { replace: true })
+  } catch (err) {
+    alert('Invalid credentials. Please try again.')
+  } finally {
+    setIsLoading(false)
   }
+}
+
+  const handleDemoLogin = async (role) => {
+  setIsLoading(true)
+  const creds = {
+    health_worker: { username: 'asha_worker', password: 'drishti123' },
+    doctor: { username: 'dr_sharma', password: 'drishti123' },
+    admin: { username: 'admin', password: 'drishti123' },
+  }
+  try {
+    const data = await login(creds[role].username, creds[role].password)
+    navigate(location.state?.from || getRoleHome(data.role), { replace: true })
+  } catch (err) {
+    alert('Demo login failed. Please try again.')
+  } finally {
+    setIsLoading(false)
+  }
+}
 
   return (
     <div className="min-h-screen bg-[#F8FAF7] flex flex-col relative overflow-hidden text-[#20312A] selection:bg-[#E6F4EA] selection:text-[#047857]">
@@ -57,14 +78,14 @@ export default function Login() {
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#E6F4EA] text-[#047857] border border-[#047857]/20">
             <span className="w-2 h-2 rounded-full bg-[#047857] animate-pulse" />
-            <span>Online</span>
+            <span>{t('common.online')}</span>
           </div>
 
           <div className="relative">
             <select
-              aria-label="Select interface language"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              aria-label={t('nav.selectInterfaceLanguage')}
+              value={i18n.language}
+              onChange={(e) => i18n.changeLanguage(e.target.value)}
               className="text-xs bg-white border border-[#E2E7E3] text-[#20312A] py-1.5 pl-2.5 pr-7 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-[#16866A] shadow-xs appearance-none cursor-pointer"
             >
               <option value="en">English (EN)</option>
@@ -96,10 +117,10 @@ export default function Login() {
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#20312A] font-heading">
-                Log in to your account
+                {t('login.title')}
               </h1>
               <p className="text-sm text-[#66756D] font-medium">
-                Better Vision. Better Tomorrow.
+                {t('nav.betterVisionBetterTomorrow')}
               </p>
               <p className="text-xs text-[#66756D]/80">
                 AI-assisted screening across 24 PHCs · Rural Tele-Ophthalmology Network
@@ -171,10 +192,10 @@ export default function Login() {
                 className="w-full min-h-[48px] px-5 py-3 rounded-xl bg-gradient-to-r from-[#D9F99D] via-[#DCFCE7] to-[#CCFBF1] text-[#14532D] font-bold border border-[#A7F3D0] shadow-xs hover:brightness-105 hover:shadow-md transition-all active:scale-[0.99] inline-flex items-center justify-center gap-2 cursor-pointer mt-2 focus:outline-none focus:ring-2 focus:ring-[#16866A] focus:ring-offset-2 text-sm sm:text-base"
               >
                 {isLoading ? (
-                  <span>Signing In...</span>
+                  <span>{t('common.loading')}</span>
                 ) : (
                   <>
-                    <span>Sign In</span>
+                    <span>{t('login.loginButton')}</span>
                     <ArrowRight className="w-4 h-4 text-[#14532D]" />
                   </>
                 )}
@@ -191,33 +212,33 @@ export default function Login() {
           {/* Demo Access Section — clearly separated card */}
           <div className="bg-[#FFFFFF] border border-[#E2E7E3] rounded-2xl shadow-[0_2px_12px_rgba(40,89,67,0.04)] p-5 space-y-3.5">
             <div className="text-center">
-              <h2 className="text-sm font-bold text-[#20312A] font-heading">Demo Access</h2>
+              <h2 className="text-sm font-bold text-[#20312A] font-heading">{t('login.demoLogin')}</h2>
               <p className="text-xs text-[#66756D] mt-0.5">Quick access for evaluation — no credentials required</p>
             </div>
             <div className="grid grid-cols-3 gap-2.5">
               <button
                 type="button"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => handleDemoLogin(DEMO_ROLES.HEALTH_WORKER)}
                 className="min-h-[44px] flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] text-[#285943] hover:bg-[#E6F4EA] hover:border-[#A7F3D0] hover:shadow-xs transition-all cursor-pointer group"
               >
                 <Users className="w-5 h-5 text-[#285943] group-hover:text-[#047857] transition-colors" strokeWidth={2} />
-                <span className="text-xs font-bold leading-tight text-center">Health Worker</span>
+                <span className="text-xs font-bold leading-tight text-center">{t('login.healthWorker')}</span>
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/doctor-dashboard')}
+                onClick={() => handleDemoLogin(DEMO_ROLES.DOCTOR)}
                 className="min-h-[44px] flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] text-[#285943] hover:bg-[#E6F4EA] hover:border-[#A7F3D0] hover:shadow-xs transition-all cursor-pointer group"
               >
                 <Stethoscope className="w-5 h-5 text-[#285943] group-hover:text-[#047857] transition-colors" strokeWidth={2} />
-                <span className="text-xs font-bold leading-tight text-center">Doctor</span>
+                <span className="text-xs font-bold leading-tight text-center">{t('login.doctor')}</span>
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/analytics')}
+                onClick={() => handleDemoLogin(DEMO_ROLES.ADMIN)}
                 className="min-h-[44px] flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] text-[#285943] hover:bg-[#E6F4EA] hover:border-[#A7F3D0] hover:shadow-xs transition-all cursor-pointer group"
               >
                 <BarChart3 className="w-5 h-5 text-[#285943] group-hover:text-[#047857] transition-colors" strokeWidth={2} />
-                <span className="text-xs font-bold leading-tight text-center">Admin</span>
+                <span className="text-xs font-bold leading-tight text-center">{t('login.admin')}</span>
               </button>
             </div>
           </div>

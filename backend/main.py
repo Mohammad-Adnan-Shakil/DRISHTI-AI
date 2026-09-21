@@ -1,7 +1,7 @@
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import classify, explain, recommend, patient, screening, referral, quality
+from app.api import classify, explain, recommend, patient, screening, referral, quality, auth
 from app.core.database import engine
 from app.core.config import settings
 from app.services.model_service import classifier
@@ -39,6 +39,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api")
 app.include_router(quality.router, prefix="/api")
 app.include_router(classify.router, prefix="/api")
 app.include_router(explain.router, prefix="/api")
