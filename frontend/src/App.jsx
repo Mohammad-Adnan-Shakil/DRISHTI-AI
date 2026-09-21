@@ -39,8 +39,8 @@ function App() {
       <Route path="/screening" element={protectedElement(<Screening />)} />
       <Route path="/doctor-dashboard" element={protectedElement(<DoctorDashboard />)} />
       <Route path="/doctor-review/:id" element={protectedElement(<DoctorReview />)} />
-      <Route path="/analytics" element={protectedElement(<Analytics />, ['Admin'])} />
-      <Route path="/referrals" element={protectedElement(<ReferralBoard />, ['Admin'])} />
+      <Route path="/analytics" element={protectedElement(<Analytics />, ['admin'])} />
+      <Route path="/referrals" element={protectedElement(<ReferralBoard />, ['admin'])} />
       <Route path="/history/:patientId" element={protectedElement(<PatientHistory />)} />
       <Route path="/history" element={protectedElement(<Navigate to="/history/DRI-2026-00421" replace />)} />
       <Route path="*" element={<Navigate to="/login" replace />} />
@@ -49,3 +49,5 @@ function App() {
 }
 
 export default App
+
+
