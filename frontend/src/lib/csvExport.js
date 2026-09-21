@@ -79,3 +79,26 @@ export function exportAnalyticsToCSV(timeframe, kpiData, phcData) {
   downloadCsv(csvContent, filename)
   return filename
 }
+
+const REFERRAL_COLUMNS = [
+  { key: 'referral_id', header: 'Referral ID' },
+  { key: 'patient_id', header: 'Patient ID' },
+  { key: 'patient_name', header: 'Patient Name' },
+  { key: 'patient_age', header: 'Patient Age' },
+  { key: 'screening_id', header: 'Screening ID' },
+  { key: 'status', header: 'Status' },
+  { key: 'doctor_notes', header: 'Doctor Notes' },
+]
+
+export function exportReferralsToCSV(referrals) {
+  const now = new Date()
+  const rows = [
+    '# DRISHTI-AI Referral Board Export',
+    `# Generated: ${now.toLocaleString('en-GB')}`,
+    REFERRAL_COLUMNS.map(column => escapeCsvField(column.header)).join(','),
+    ...referrals.map(referral => REFERRAL_COLUMNS.map(column => escapeCsvField(referral[column.key])).join(',')),
+  ]
+  const filename = `DRISHTI_Referrals_${formatDateForFilename(now)}.csv`
+  downloadCsv(rows.join('\r\n'), filename)
+  return filename
+}

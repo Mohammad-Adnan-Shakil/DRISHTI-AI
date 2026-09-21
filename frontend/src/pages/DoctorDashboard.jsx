@@ -63,12 +63,12 @@ function dedupeByPatientAndTime(records) {
 // (same response shape) to the display format this page renders.
 function mapScreeningRows(rows) {
   return rows.map(s => ({
-    id: s.patient_id || s.id || 'DRI-2026-00000',
-    name: s.patient_name || s.name || 'Patient',
-    phc: s.phc_id || 'PHC Hosakote',
+    id: s.patient_id ?? s.id ?? s.screening_id,
+    name: s.patient_name || s.name || 'Unnamed patient',
+    phc: s.phc_id || 'N/A',
     drGrade: s.dr_grade ?? 0,
-    confidence: `${s.dr_confidence ?? 90}%`,
-    time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+    confidence: s.dr_confidence != null ? `${s.dr_confidence}%` : 'N/A',
+    time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A',
     urgency: getUrgency(s.dr_grade ?? 0),
     railColor: getRailColor(s.dr_grade ?? 0)
   }))
@@ -81,9 +81,16 @@ export default function DoctorDashboard() {
   const [reviewedData, setReviewedData] = useState([])
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     async function fetchData() {
+      setLoading(true)
+      setError(null)
+      setQueueData([])
+      setReviewedData([])
+      setStats(null)
       try {
         const [pendingRes, reviewedRes, statsRes] = await Promise.allSettled([
           getPendingScreenings(),
@@ -91,31 +98,56 @@ export default function DoctorDashboard() {
           getScreeningStats()
         ])
 
-        if (pendingRes.status === 'fulfilled' && pendingRes.value?.length > 0) {
+        if (pendingRes.status === 'fulfilled') {
           const deduped = dedupeByPatientAndTime(pendingRes.value)
           setQueueData(mapScreeningRows(deduped))
         }
 
-        if (reviewedRes.status === 'fulfilled' && reviewedRes.value?.length > 0) {
+        if (reviewedRes.status === 'fulfilled') {
           setReviewedData(mapScreeningRows(reviewedRes.value))
         }
 
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           const s = statsRes.value
           setStats({
-            pending: s.pending_reviews ?? s.total_screenings ?? 0,
-            reviewed: s.reviewed_today ?? 0,
-            confirmed: s.referrals_confirmed ?? 0,
+            pending: s.pending_reviews ?? null,
+            reviewed: s.reviewed_today ?? null,
+            confirmed: s.referrals_confirmed ?? null,
           })
+        }
+        const failures = [
+          pendingRes.status === 'rejected' ? 'pending screenings' : null,
+          reviewedRes.status === 'rejected' ? 'reviewed screenings' : null,
+          statsRes.status === 'rejected' ? 'screening statistics' : null,
+        ].filter(Boolean)
+        if (failures.length > 0) {
+          setError(`Could not load ${failures.join(' and ')}. Please retry.`)
         }
       } catch (err) {
         console.error('DoctorDashboard fetch failed:', err)
+        setError('Could not load the review queue. Please retry.')
       } finally {
         setLoading(false)
       }
     }
     fetchData()
-  }, [])
+  }, [reloadToken])
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] antialiased">
+        <DoctorNavbar />
+        <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div role="alert" className="bg-white rounded-xl border border-amber-200 p-8 text-center">
+            <AlertTriangle className="w-10 h-10 mx-auto text-amber-600 mb-3" />
+            <h1 className="text-lg font-bold">Review queue unavailable</h1>
+            <p className="text-sm text-[#66756D] mt-2">{error}</p>
+            <button type="button" onClick={() => setReloadToken(value => value + 1)} className="btn-secondary mt-5 text-sm">Retry</button>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   const filteredQueue = filterSeverity === 'reviewed' ? reviewedData : queueData.filter(item => {
     if (filterSeverity === 'critical') return item.drGrade === 4
@@ -167,7 +199,7 @@ export default function DoctorDashboard() {
               </div>
               <div>
                 <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#DC2626] tracking-tight">{loading ? <Skeleton className="h-9 w-10" /> : stats?.pending ?? 0}</div>
-                <div className="flex items-center gap-1 text-[11px] text-rose-600 font-semibold mt-1"><span>● 3 urgent (Grade 3/4)</span></div>
+                <div className="flex items-center gap-1 text-[11px] text-rose-600 font-semibold mt-1"><span>{loading ? 'Loading urgency data...' : `${queueData.filter(item => item.drGrade >= 3).length} urgent (Grade 3/4)`}</span></div>
               </div>
             </div>
             <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#16866A] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
@@ -177,7 +209,7 @@ export default function DoctorDashboard() {
               </div>
               <div>
                 <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#16866A] tracking-tight">{loading ? <Skeleton className="h-9 w-10" /> : stats?.reviewed ?? 0}</div>
-                <div className="flex items-center gap-1 text-[11px] text-[#047857] font-semibold mt-1"><span>↑ 8 cases from yesterday</span></div>
+                <div className="flex items-center gap-1 text-[11px] text-[#047857] font-semibold mt-1"><span>{stats?.reviewed != null ? 'Live reviewed count' : 'Not provided by API'}</span></div>
               </div>
             </div>
             <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#285943] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
@@ -186,8 +218,8 @@ export default function DoctorDashboard() {
                 <div className="w-8 h-8 rounded-lg bg-[#E6F4EA] border border-[#285943]/20 flex items-center justify-center text-[#285943]"><Users className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#285943] tracking-tight">{loading ? <Skeleton className="h-9 w-10" /> : stats?.confirmed ?? 0}</div>
-                <div className="flex items-center gap-1 text-[11px] text-[#285943] font-semibold mt-1"><span>81.2% confirmation rate</span></div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#285943] tracking-tight">{loading ? <Skeleton className="h-9 w-10" /> : stats?.confirmed ?? 'N/A'}</div>
+                <div className="flex items-center gap-1 text-[11px] text-[#285943] font-semibold mt-1"><span>Not provided by API</span></div>
               </div>
             </div>
             <div className="bg-white rounded-xl p-4 sm:p-5 border border-[#E2E7E3] border-l-4 border-l-[#64748B] shadow-[0_2px_12px_rgba(40,89,67,0.04)] flex flex-col justify-between">
@@ -196,8 +228,8 @@ export default function DoctorDashboard() {
                 <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[#64748B]"><Clock className="w-4 h-4" /></div>
               </div>
               <div>
-                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#64748B] tracking-tight">4m 32s</div>
-                <div className="flex items-center gap-1 text-[11px] text-[#66756D] font-medium mt-1"><span>Within clinical SLA (&lt; 8m)</span></div>
+                <div className="font-heading text-3xl sm:text-4xl font-extrabold text-[#64748B] tracking-tight">N/A</div>
+                <div className="flex items-center gap-1 text-[11px] text-[#66756D] font-medium mt-1"><span>Not provided by API</span></div>
               </div>
             </div>
           </div>
@@ -216,8 +248,8 @@ export default function DoctorDashboard() {
                 <span>AI screening supports clinical decision-making. Final clinical assessment is performed by the qualified doctor.</span>
               </p>
             </div>
-            <div className="flex items-center gap-2 self-start md:self-center">
-              <div className="inline-flex rounded-full p-1 bg-[#F8FAF7] border border-[#E2E7E3] text-xs gap-1">
+            <div className="flex items-center gap-2 self-start md:self-center min-w-0 w-full md:w-auto">
+              <div className="flex rounded-full p-1 bg-[#F8FAF7] border border-[#E2E7E3] text-xs gap-1 overflow-x-auto max-w-full">
                 {[
                   { id: 'all', label: `All (${queueData.length})` },
                   { id: 'critical', label: 'Grade 4 (1)' },
@@ -226,7 +258,7 @@ export default function DoctorDashboard() {
                   { id: 'reviewed', label: `Reviewed (${reviewedData.length})` }
                 ].map(tab => (
                   <button key={tab.id} type="button" onClick={() => setFilterSeverity(tab.id)}
-                    className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer ${
+                    className={`px-3 py-1 rounded-full text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       filterSeverity === tab.id
                         ? 'bg-gradient-to-r from-[#D9F99D] via-[#DCFCE7] to-[#CCFBF1] text-[#14532D] font-bold border border-[#A7F3D0] shadow-2xs'
                         : 'text-[#66756D] hover:text-[#20312A] hover:bg-white/80 font-medium'

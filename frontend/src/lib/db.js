@@ -22,7 +22,10 @@ export async function queueScreening(screeningData) {
     const tx = db.transaction(STORE_NAME, 'readwrite')
     const store = tx.objectStore(STORE_NAME)
     const req = store.add({ ...screeningData, queued_at: new Date().toISOString() })
-    req.onsuccess = () => resolve(req.result)
+    req.onsuccess = () => {
+      window.dispatchEvent(new CustomEvent('drishti:offline-queued', { detail: { id: req.result } }))
+      resolve(req.result)
+    }
     req.onerror = () => reject(req.error)
   })
 }
@@ -44,7 +47,10 @@ export async function removeFromQueue(id) {
     const tx = db.transaction(STORE_NAME, 'readwrite')
     const store = tx.objectStore(STORE_NAME)
     const req = store.delete(id)
-    req.onsuccess = () => resolve()
+    req.onsuccess = () => {
+      window.dispatchEvent(new CustomEvent('drishti:offline-dequeued', { detail: { id } }))
+      resolve()
+    }
     req.onerror = () => reject(req.error)
   })
 }
@@ -57,5 +63,24 @@ export async function getQueueCount() {
     const req = store.count()
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
+  })
+}
+
+export async function updateQueueItem(id, updates) {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    const store = tx.objectStore(STORE_NAME)
+    const getRequest = store.get(id)
+    getRequest.onsuccess = () => {
+      if (!getRequest.result) {
+        reject(new Error(`Offline queue item ${id} not found`))
+        return
+      }
+      const request = store.put({ ...getRequest.result, ...updates })
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    }
+    getRequest.onerror = () => reject(getRequest.error)
   })
 }

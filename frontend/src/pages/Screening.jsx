@@ -22,6 +22,7 @@ import {
   ImageOff
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
+import { useTranslation } from 'react-i18next'
 import GradeBadge from '../components/GradeBadge'
 import ScreeningReportPDF from '../components/ScreeningReportPDF'
 import { handleZoomIn, handleZoomOut, handleZoomReset } from '../lib/zoomHandlers'
@@ -74,69 +75,6 @@ const PATIENTS = {
   }
 }
 
-const GRADE_CONFIG = {
-  0: {
-    title: 'Grade 0 · No Diabetic Retinopathy',
-    risk: 'No Risk',
-    riskColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    findings: 'No signs of diabetic eye disease detected.',
-    recommendationTitle: 'Routine Annual Follow-up at PHC',
-    recommendation: 'Continue annual eye check-up and manage diabetes well.',
-    timeframe: 'Routine follow-up in 12 months',
-    primaryActionLabel: '✓ Save & Discharge',
-    primaryActionRoute: '/dashboard',
-    urgencyText: 'Routine Annual Surveillance'
-  },
-  1: {
-    title: 'Grade 1 · Mild Non-Proliferative DR',
-    risk: 'Low to Moderate Risk',
-    riskColor: 'bg-amber-100 text-amber-800 border-amber-300',
-    findings: 'Early changes detected. Close monitoring recommended.',
-    recommendationTitle: '6-Month Surveillance & Glycemic Review',
-    recommendation: 'Re-check in 6 months and keep blood sugar under control.',
-    timeframe: 'Re-screen at PHC in 6 months',
-    primaryActionLabel: '✓ Save & Discharge',
-    primaryActionRoute: '/dashboard',
-    urgencyText: 'Semi-Annual Surveillance'
-  },
-  2: {
-    title: 'Grade 2 · Moderate Non-Proliferative DR',
-    risk: 'HIGH RISK',
-    riskColor: 'bg-orange-100 text-orange-800 border-orange-200',
-    findings: 'Moderate changes detected in the eye.',
-    recommendationTitle: 'Refer patient for ophthalmologist evaluation',
-    recommendation: 'Visit an eye specialist at the district hospital within 2-4 weeks.',
-    timeframe: 'Recommended evaluation: Within 2–4 weeks',
-    primaryActionLabel: '↗ Save & Create Referral',
-    primaryActionRoute: '/dashboard',
-    urgencyText: 'High Urgency Referral'
-  },
-  3: {
-    title: 'Grade 3 · Severe Non-Proliferative DR',
-    risk: 'URGENT RISK',
-    riskColor: 'bg-rose-100 text-rose-800 border-rose-200',
-    findings: 'Significant changes detected. Prompt care needed.',
-    recommendationTitle: 'Urgent Ophthalmology Referral Required',
-    recommendation: 'Visit an eye specialist urgently within 1-2 weeks.',
-    timeframe: 'Urgent referral: Within 1–2 weeks',
-    primaryActionLabel: '↗ Save & Create Referral',
-    primaryActionRoute: '/dashboard',
-    urgencyText: 'Urgent Ophthalmology Referral'
-  },
-  4: {
-    title: 'Grade 4 · Proliferative Diabetic Retinopathy',
-    risk: 'CRITICAL SIGHT THREAT',
-    riskColor: 'bg-red-100 text-red-900 border-red-300',
-    findings: 'Advanced changes detected. Immediate care required.',
-    recommendationTitle: 'Immediate Specialist Referral & Intervention',
-    recommendation: 'Go to a specialist hospital within 48 hours. Do not delay.',
-    timeframe: 'Immediate referral: Within 48–72 hours',
-    primaryActionLabel: '↗ Save & Create Referral',
-    primaryActionRoute: '/dashboard',
-    urgencyText: 'Critical Sight-Threatening Emergency'
-  }
-}
-
 // Maps a backend PatientResponse (integer id, snake_case fields) onto the
 // display shape the rest of this page expects.
 function mapApiPatientToDisplay(patient) {
@@ -169,19 +107,92 @@ function mapApiPatientToDisplay(patient) {
   }
 }
 
-const STEPS = [
-  { id: 'select-patient', number: 1, label: 'Select Patient' },
-  { id: 'capture', number: 2, label: 'Capture Image' },
-  { id: 'quality-check', number: 3, label: 'Quality Check' },
-  { id: 'processing', number: 4, label: 'AI Analysis' },
-  { id: 'results', number: 5, label: 'Results' }
+const STEPS_IDS = [
+  { id: 'select-patient', number: 1 },
+  { id: 'capture', number: 2 },
+  { id: 'quality-check', number: 3 },
+  { id: 'processing', number: 4 },
+  { id: 'results', number: 5 }
 ]
 
 export default function Screening() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
+
+  // GRADE_CONFIG is inside the component so t() is available
+  const GRADE_CONFIG = {
+    0: {
+      title: t('grade.0.title'),
+      risk: t('grade.0.risk'),
+      riskColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      findings: t('grade.0.findings'),
+      recommendationTitle: t('grade.0.recommendationTitle'),
+      recommendation: t('grade.0.recommendation'),
+      timeframe: t('grade.0.timeframe'),
+      primaryActionLabel: t('grade.0.urgencyText'),
+      primaryActionRoute: '/dashboard',
+      urgencyText: t('grade.0.urgencyText')
+    },
+    1: {
+      title: t('grade.1.title'),
+      risk: t('grade.1.risk'),
+      riskColor: 'bg-amber-100 text-amber-800 border-amber-300',
+      findings: t('grade.1.findings'),
+      recommendationTitle: t('grade.1.recommendationTitle'),
+      recommendation: t('grade.1.recommendation'),
+      timeframe: t('grade.1.timeframe'),
+      primaryActionLabel: t('screening.saveAndDischarge'),
+      primaryActionRoute: '/dashboard',
+      urgencyText: t('grade.1.urgencyText')
+    },
+    2: {
+      title: t('grade.2.title'),
+      risk: t('grade.2.risk'),
+      riskColor: 'bg-orange-100 text-orange-800 border-orange-200',
+      findings: t('grade.2.findings'),
+      recommendationTitle: t('grade.2.recommendationTitle'),
+      recommendation: t('grade.2.recommendation'),
+      timeframe: t('grade.2.timeframe'),
+      primaryActionLabel: t('screening.saveAndCreateReferral'),
+      primaryActionRoute: '/dashboard',
+      urgencyText: t('grade.2.urgencyText')
+    },
+    3: {
+      title: t('grade.3.title'),
+      risk: t('grade.3.risk'),
+      riskColor: 'bg-rose-100 text-rose-800 border-rose-200',
+      findings: t('grade.3.findings'),
+      recommendationTitle: t('grade.3.recommendationTitle'),
+      recommendation: t('grade.3.recommendation'),
+      timeframe: t('grade.3.timeframe'),
+      primaryActionLabel: t('screening.saveAndCreateReferral'),
+      primaryActionRoute: '/dashboard',
+      urgencyText: t('grade.3.urgencyText')
+    },
+    4: {
+      title: t('grade.4.title'),
+      risk: t('grade.4.risk'),
+      riskColor: 'bg-red-100 text-red-900 border-red-300',
+      findings: t('grade.4.findings'),
+      recommendationTitle: t('grade.4.recommendationTitle'),
+      recommendation: t('grade.4.recommendation'),
+      timeframe: t('grade.4.timeframe'),
+      primaryActionLabel: t('screening.saveAndCreateReferral'),
+      primaryActionRoute: '/dashboard',
+      urgencyText: t('grade.4.urgencyText')
+    }
+  }
+
+  const STEPS = [
+    { id: 'select-patient', number: 1, label: t('screening.selectPatientStep') },
+    { id: 'capture', number: 2, label: t('screening.captureStep') },
+    { id: 'quality-check', number: 3, label: t('screening.qualityCheckStep') },
+    { id: 'processing', number: 4, label: t('screening.processingStep') },
+    { id: 'results', number: 5, label: t('screening.resultsStep') }
+  ]
 
   const [screeningStep, setScreeningStep] = useState('capture')
   const [selectedPatientId, setSelectedPatientId] = useState('DRI-2026-00421')
@@ -211,6 +222,9 @@ export default function Screening() {
   const [heatmapUrl, setHeatmapUrl] = useState(null)
   const [fundusImageUrl, setFundusImageUrl] = useState(null)
   const [recommendationText, setRecommendationText] = useState(null)
+  // Kannada-only: Groq-generated translation of the Salient Clinical
+  // Findings text (English stays as the GRADE_CONFIG default otherwise).
+  const [findingsText, setFindingsText] = useState(null)
   const [apiError, setApiError] = useState(null)
 
   // Simulated Grade (for demo override)
@@ -279,13 +293,13 @@ export default function Screening() {
     const handleSyncStatus = (event) => {
       const { status, offlineKey } = event.detail || {}
       if (!offlineQueueKey || offlineKey !== offlineQueueKey) return
-      if (status === 'syncing') setSaveSuccess('Syncing offline screening...')
-      if (status === 'synced') setSaveSuccess('Offline screening synced successfully.')
-      if (status === 'failed') setSaveSuccess('Offline screening is still waiting to sync.')
+      if (status === 'syncing') setSaveSuccess(t('screening.syncingOfflineScreening'))
+      if (status === 'synced') setSaveSuccess(t('screening.offlineScreeningSynced'))
+      if (status === 'failed') setSaveSuccess(t('screening.offlineScreeningWaiting'))
     }
     window.addEventListener('drishti:offline-sync', handleSyncStatus)
     return () => window.removeEventListener('drishti:offline-sync', handleSyncStatus)
-  }, [offlineQueueKey])
+  }, [offlineQueueKey, t])
 
   const selectedPatient = apiPatients[selectedPatientId] || PATIENTS[selectedPatientId] || PATIENTS['DRI-2026-00421']
 
@@ -293,6 +307,10 @@ export default function Screening() {
   const activeGrade = aiResult ? aiResult.grade : simulatedGrade
   const activeConfidence = aiResult ? aiResult.confidence : GRADE_CONFIG[simulatedGrade].confidence ?? 94
   const gradeInfo = GRADE_CONFIG[activeGrade] || GRADE_CONFIG[2]
+  // True once the image has been handed off to the offline queue for later
+  // classification — the grade shown is only the Demo Simulator placeholder,
+  // so saving/creating a referral now would duplicate what sync.js will do.
+  const isPendingOfflineClassification = Boolean(offlineQueueKey) && !aiResult
 
   // Zoom handlers
   const zoomIn = () => handleZoomIn(setZoomLevel)
@@ -317,7 +335,7 @@ export default function Screening() {
         return
       } catch (err) {
         console.error('Patient lookup failed:', err)
-        setPatientLookupError(`No patient found for ID ${query}.`)
+        setPatientLookupError(t('screening.noPatientFound', { query }))
       } finally {
         setPatientLookupLoading(false)
       }
@@ -327,7 +345,7 @@ export default function Screening() {
     if (query.toLowerCase().includes('00418') || query.toLowerCase().includes('ramesh')) {
       setSelectedPatientId('DRI-2026-00418')
     } else if (query) {
-      setPatientLookupError(`No patient found matching "${query}".`)
+      setPatientLookupError(t('screening.noPatientMatching', { query }))
     } else {
       setSelectedPatientId('DRI-2026-00421')
     }
@@ -352,7 +370,7 @@ export default function Screening() {
       const result = await qualityCheck(imageFile)
       setQualityScore(result.quality_score ?? null)
       if (result.quality_score == null) {
-        setQualityError('Quality check returned no score. Please retry the image check.')
+        setQualityError(t('screening.qualityCheckUnavailable'))
       }
       if (result.passed === false) {
         setIsQualityRejected(true)
@@ -378,6 +396,40 @@ export default function Screening() {
     if (file) handleUploadImage(file)
   }
 
+  // Offline (or a first-attempt network failure) — skip the whole
+  // classify/explain/recommend pipeline, which all require the backend, and
+  // queue the raw image + patient + a provisional Demo Simulator grade for
+  // classification once connectivity returns. This removes the AI-result
+  // dependency from the offline path entirely: previously a screening could
+  // only be queued *after* a successful classify (see handleSaveScreening).
+  const queueForOfflineClassification = async (file) => {
+    if (!selectedPatient.realId) {
+      setApiError(t('screening.selectRegisteredPatient'))
+      setIsAnalyzing(false)
+      return
+    }
+    const offlineKey = [selectedPatient.realId, file?.name || 'screening', Date.now()].join(':')
+    try {
+      await queueScreening({
+        type: 'pending_classification',
+        image: file,
+        patient_id: selectedPatient.realId,
+        demo_grade: simulatedGrade,
+        offline_key: offlineKey,
+      })
+      setOfflineQueueKey(offlineKey)
+      setApiError(null)
+      setSaveSuccess(t('screening.screeningQueuedOffline'))
+    } catch (err) {
+      console.error('Offline classification queue failed:', err)
+      setApiError(t('screening.couldNotQueueOffline'))
+    } finally {
+      setIsAnalyzing(false)
+      setPipelineStage(5); setAnalysisProgress(100)
+      setScreeningStep('results')
+    }
+  }
+
   // AI Pipeline — real API calls
   // fileOverride lets the quality-check failure path hand off the just-picked
   // file directly, since uploadedFile's state update may not have flushed
@@ -385,6 +437,14 @@ export default function Screening() {
   // which isn't a File and is ignored), so they still fall back to state.
   const startAIAnalysis = async (fileOverride) => {
     const activeFile = fileOverride instanceof File ? fileOverride : uploadedFile
+
+    if (activeFile && !navigator.onLine) {
+      setScreeningStep('processing')
+      setIsAnalyzing(true)
+      await queueForOfflineClassification(activeFile)
+      return
+    }
+
     setScreeningStep('processing')
     setIsAnalyzing(true)
     setPipelineStage(1)
@@ -413,7 +473,7 @@ export default function Screening() {
           setHeatmapUrl(explainResult.heatmap_url)
         } catch (err) {
           console.error('Explanation failed:', err)
-          setApiError('AI explanation is unavailable. Please retry the analysis.')
+          setApiError(t('screening.aiExplanationUnavailable'))
           setIsAnalyzing(false)
           return
         }
@@ -439,9 +499,13 @@ export default function Screening() {
           }
         })
         setRecommendationText(rec.recommendation)
+        // Kannada patients also see the Salient Clinical Findings text
+        // translated via this same Groq recommendation — English keeps the
+        // static GRADE_CONFIG findings copy (findingsText stays null).
+        setFindingsText(language === 'Kannada' ? rec.recommendation : null)
       } catch (err) {
         console.error('Recommendation failed:', err)
-        setApiError('Recommendation is unavailable. Please retry the analysis.')
+        setApiError(t('screening.recommendationUnavailable'))
         setIsAnalyzing(false)
         return
       }
@@ -453,7 +517,14 @@ export default function Screening() {
 
     } catch (err) {
       console.error('AI analysis failed:', err)
-      setApiError('AI analysis failed. Please retry the analysis.')
+      // A network-level failure (TypeError: "Failed to fetch") even though
+      // navigator.onLine reported true — flaky connection, DNS hiccup, etc.
+      // Treat it the same as being offline rather than dead-ending the user.
+      if (activeFile && err instanceof TypeError) {
+        await queueForOfflineClassification(activeFile)
+        return
+      }
+      setApiError(t('screening.aiAnalysisFailed'))
       setIsAnalyzing(false)
       setPipelineStage(3); setAnalysisProgress(60)
     }
@@ -462,6 +533,7 @@ export default function Screening() {
   // Save screening result
   const handleSaveScreening = async () => {
     if (isSaving) return // already submitting — ignore repeat clicks
+    if (isPendingOfflineClassification) return // already queued — sync.js will save + refer once classified
     setIsSaving(true)
     setApiError(null)
     setSaveSuccess(null)
@@ -473,7 +545,7 @@ export default function Screening() {
         navigate(gradeInfo.primaryActionRoute)
         return
       }
-      setApiError('Select a registered patient before saving this screening.')
+      setApiError(t('screening.selectRegisteredPatient'))
       setIsSaving(false)
       return
     }
@@ -503,7 +575,7 @@ export default function Screening() {
       const existing = pending.find(item => item.offline_key === offlineKey)
       if (existing) {
         setOfflineQueueKey(offlineKey)
-        setSaveSuccess('Screening saved offline. Waiting for connection.')
+        setSaveSuccess(t('screening.screeningSavedOffline'))
         setIsSaving(false)
         return
       }
@@ -515,7 +587,7 @@ export default function Screening() {
         referral_patient_id: selectedPatient.realId,
       })
       setOfflineQueueKey(offlineKey)
-      setSaveSuccess('Screening saved offline. Waiting for connection.')
+      setSaveSuccess(t('screening.screeningSavedOffline'))
       setIsSaving(false)
     }
 
@@ -524,7 +596,7 @@ export default function Screening() {
         await queueOffline()
       } catch (err) {
         console.error('Offline screening queue failed:', err)
-        setApiError('Could not save screening offline. Please try again.')
+        setApiError(t('screening.couldNotSaveOffline'))
         setIsSaving(false)
       }
       return
@@ -558,14 +630,14 @@ export default function Screening() {
           await queueOffline()
         } catch (queueError) {
           console.error('Offline screening queue failed:', queueError)
-          setApiError('Connection failed and the screening could not be saved offline. Please try again.')
+          setApiError(t('screening.connectionFailed'))
           setIsSaving(false)
         }
         return
       }
       setApiError(screeningId
-        ? `Screening ${screeningId} was saved, but referral creation failed. You can retry the referral.`
-        : 'Could not save screening. Please try again.')
+        ? t('screening.screeningSavedReferralFailed', { id: screeningId })
+        : t('screening.couldNotSaveScreening'))
       setIsSaving(false)
     }
   }
@@ -587,6 +659,28 @@ export default function Screening() {
 
   const getStepIndex = (stepId) => STEPS.findIndex(s => s.id === stepId)
   const currentStepIndex = getStepIndex(screeningStep)
+
+  const LAYER_OPTIONS = [
+    { id: 'original', label: t('screening.original') },
+    { id: 'gradcam', label: t('screening.gradcamHeatmap') },
+    { id: 'vessel', label: t('screening.vesselMap') },
+    { id: 'compare', label: t('screening.compare') }
+  ]
+
+  const PIPELINE_STAGES = [
+    t('screening.stage1'),
+    t('screening.stage2'),
+    t('screening.stage3'),
+    t('screening.stage4'),
+    t('screening.stage5')
+  ]
+
+  const QUALITY_LABELS = [
+    t('screening.illumination'),
+    t('screening.retinaCentered'),
+    t('screening.minimalBlur'),
+    t('screening.fieldOfView')
+  ]
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] pb-16 md:pb-12">
@@ -610,7 +704,7 @@ export default function Screening() {
       <Navbar />
 
       {selectedPatient && (
-        <aside aria-label="Selected Patient Banner" className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-[#E2E7E3] px-4 sm:px-6 lg:px-8 py-2.5 shadow-xs transition-all">
+        <aside aria-label={t('screening.activePatientRecord')} className="sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-[#E2E7E3] px-4 sm:px-6 lg:px-8 py-2.5 shadow-xs transition-all">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span className="w-2.5 h-2.5 rounded-full bg-[#16866A]" />
@@ -624,7 +718,7 @@ export default function Screening() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="px-2.5 py-1 rounded-full bg-[#F8FAF7] border border-[#E2E7E3] font-semibold text-[#20312A] text-[11px] sm:text-xs">
-                {activeEye === 'OD' ? 'OD (Right Eye)' : 'OS (Left Eye)'}
+                {activeEye === 'OD' ? t('dashboard.rightEye') : t('dashboard.leftEye')}
               </span>
               {screeningStep === 'results' && <GradeBadge grade={activeGrade} />}
             </div>
@@ -640,7 +734,7 @@ export default function Screening() {
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="flex-1">{apiError}</span>
             {uploadedFile && !isSaving && (
-              <button type="button" onClick={startAIAnalysis} className="font-semibold underline">Retry</button>
+              <button type="button" onClick={startAIAnalysis} className="font-semibold underline">{t('common.retry')}</button>
             )}
           </div>
         )}
@@ -652,7 +746,7 @@ export default function Screening() {
         )}
 
         {/* 5-STEP STEPPER */}
-        <section aria-label="Screening Progress" className="bg-white rounded-2xl border border-[#E2E7E3] p-3.5 sm:p-4 shadow-sm">
+        <section aria-label={t('screening.screeningProgress')} className="bg-white rounded-2xl border border-[#E2E7E3] p-3.5 sm:p-4 shadow-sm">
           <div className="hidden sm:flex items-center justify-between gap-2">
             {STEPS.map((step, idx) => {
               const isCompleted = idx < currentStepIndex
@@ -691,18 +785,18 @@ export default function Screening() {
           <div className="sm:hidden flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-1 rounded-full font-bold bg-[#E6F4EA] text-[#047857] border border-[#047857]/20">
-                Step {currentStepIndex + 1} of 5
+                {t('screening.stepOf', { current: currentStepIndex + 1, total: 5 })}
               </span>
               <span className="font-bold text-[#20312A]">{STEPS[currentStepIndex].label}</span>
             </div>
             <div className="flex items-center gap-1.5">
               {currentStepIndex > 0 && (
                 <button type="button" onClick={() => setScreeningStep(STEPS[currentStepIndex - 1].id)}
-                  className="px-2 py-1 bg-[#F8FAF7] border border-[#E2E7E3] rounded text-[11px] font-medium text-[#20312A]">Prev</button>
+                  className="px-2 py-1 bg-[#F8FAF7] border border-[#E2E7E3] rounded text-[11px] font-medium text-[#20312A]">{t('common.previous')}</button>
               )}
               {currentStepIndex < STEPS.length - 1 && (
                 <button type="button" onClick={() => setScreeningStep(STEPS[currentStepIndex + 1].id)}
-                  className="px-2 py-1 bg-gradient-to-r from-[#D9F99D] via-[#DCFCE7] to-[#CCFBF1] text-[#14532D] border border-[#A7F3D0] rounded text-[11px] font-bold">Next</button>
+                  className="px-2 py-1 bg-gradient-to-r from-[#D9F99D] via-[#DCFCE7] to-[#CCFBF1] text-[#14532D] border border-[#A7F3D0] rounded text-[11px] font-bold">{t('common.next')}</button>
               )}
             </div>
           </div>
@@ -717,25 +811,25 @@ export default function Screening() {
             {/* SELECT PATIENT */}
             <div className="bg-white rounded-2xl border border-[#E2E7E3] p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#66756D]">Select Patient</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#66756D]">{t('screening.selectPatient')}</span>
                 <span className="text-[11px] text-[#16866A] font-semibold bg-[#E6F4EA] px-2 py-0.5 rounded-full">PHC Hosakote</span>
               </div>
               <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by Patient ID (00421) or Name..."
+                    placeholder={t('screening.searchByPatientID')}
                     className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-[#E2E7E3] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#16866A] text-[#20312A]" />
                 </div>
                 <button type="submit" disabled={patientLookupLoading} className="px-4 py-2 text-xs font-semibold rounded-xl bg-white hover:bg-[#E6F4EA] text-[#20312A] border border-[#E2E7E3] shadow-2xs transition-colors cursor-pointer disabled:opacity-60">
-                  {patientLookupLoading ? 'Searching...' : 'Search'}
+                  {patientLookupLoading ? t('screening.searching') : t('common.search')}
                 </button>
               </form>
               {patientLookupError && (
                 <p className="mt-2 text-[11px] text-rose-600 font-medium">{patientLookupError}</p>
               )}
               <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
-                <span className="text-[#66756D] text-[11px]">Recent:</span>
+                <span className="text-[#66756D] text-[11px]">{t('screening.recent')}</span>
                 {['DRI-2026-00421', 'DRI-2026-00418'].map(pid => (
                   <button key={pid} type="button" onClick={() => setSelectedPatientId(pid)}
                     className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-all cursor-pointer ${
@@ -754,7 +848,7 @@ export default function Screening() {
               <div className="bg-[#285943]/5 px-5 py-3.5 border-b border-[#E2E7E3] flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#047857]" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#20312A]">Active Patient Record</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#20312A]">{t('screening.activePatientRecord')}</span>
                 </div>
               </div>
               <div className="p-5 space-y-4">
@@ -772,43 +866,43 @@ export default function Screening() {
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 text-xs">
                   <div className="bg-[#F8FAF7] border border-[#E2E7E3] p-3 rounded-xl">
-                    <span className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider block">Age / Gender</span>
+                    <span className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider block">{t('screening.ageGender')}</span>
                     <span className="font-bold text-[#20312A] mt-0.5 block">{selectedPatient.ageGender}</span>
                   </div>
                   <div className="bg-[#F8FAF7] border border-[#E2E7E3] p-3 rounded-xl">
-                    <span className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider block">Diabetes Duration</span>
+                    <span className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider block">{t('screening.diabetesDuration')}</span>
                     <span className="font-bold text-[#20312A] mt-0.5 block">{selectedPatient.diabetesDuration}</span>
                   </div>
                   <div className="bg-amber-50/70 border border-amber-200 p-3 rounded-xl">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-semibold text-amber-800 uppercase tracking-wider block">Latest HbA1c</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">Elevated</span>
+                      <span className="text-[10px] font-semibold text-amber-800 uppercase tracking-wider block">{t('screening.latestHba1c')}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">{t('screening.elevated')}</span>
                     </div>
                     <span className="font-bold text-amber-900 mt-0.5 block">{selectedPatient.hba1c}</span>
                   </div>
                   <div className="bg-[#F8FAF7] border border-[#E2E7E3] p-3 rounded-xl">
-                    <span className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider block">Hypertension</span>
+                    <span className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider block">{t('screening.hypertension')}</span>
                     <span className="font-bold text-[#20312A] mt-0.5 block">{selectedPatient.hypertension}</span>
                   </div>
                 </div>
                 <div className="space-y-2 text-xs pt-1">
                   <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3]">
-                    <span className="text-[#475569]">Preferred Language:</span>
-                    <span className="font-semibold text-[#20312A]">{selectedPatient.language} • Audio Guidance</span>
+                    <span className="text-[#475569]">{t('screening.preferredLanguage')}:</span>
+                    <span className="font-semibold text-[#20312A]">{selectedPatient.language} • {t('common.audioGuidance')}</span>
                   </div>
                   <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3]">
-                    <span className="text-[#475569]">Prior DR Status:</span>
+                    <span className="text-[#475569]">{t('screening.priorDRStatus')}:</span>
                     <GradeBadge grade={selectedPatient.priorGrade} />
                   </div>
                   <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3]">
-                    <span className="text-[#475569]">Primary ABHA ID:</span>
+                    <span className="text-[#475569]">{t('screening.primaryABHAID')}:</span>
                     <span className="font-mono font-medium text-[#20312A]">{selectedPatient.abhaId}</span>
                   </div>
                 </div>
                 <div className="pt-2">
                   <Link to={`/history/${selectedPatient.id}`}
                     className="w-full py-2.5 bg-white hover:bg-[#E6F4EA] border border-[#E2E7E3] text-[#20312A] text-xs font-semibold rounded-xl transition-colors inline-flex items-center justify-center gap-1.5 shadow-2xs">
-                    <span>View Longitudinal History</span>
+                    <span>{t('screening.viewLongitudinalHistory')}</span>
                     <ArrowRight className="w-3.5 h-3.5 text-[#285943]" />
                   </Link>
                 </div>
@@ -819,17 +913,17 @@ export default function Screening() {
             <div className="bg-[#F8FAF7] rounded-2xl border border-[#E2E7E3]/70 p-4 sm:p-5 space-y-2.5">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-[#16866A]" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#475569]">PHC Clinical Screening Protocol</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#475569]">{t('screening.phcClinicalScreeningProtocol')}</h3>
               </div>
               <ul className="text-xs text-[#66756D] space-y-1.5 list-disc pl-4 leading-relaxed">
-                <li>Acquire 45° non-mydriatic retinal fundus image in a semi-darkened room.</li>
-                <li>Ensure patient looks directly at green internal fixation target.</li>
-                <li>Verify automated QA illumination and focus score before AI inference.</li>
-                <li>Screening result assists decision-making; suspicious cases must be verified.</li>
+                <li>{t('screening.protocol1')}</li>
+                <li>{t('screening.protocol2')}</li>
+                <li>{t('screening.protocol3')}</li>
+                <li>{t('screening.protocol4')}</li>
               </ul>
               <div className="pt-2 border-t border-[#E2E7E3]/60 flex items-center justify-between text-[11px] text-[#66756D]">
-                <span>Edge AI Model: <strong>EfficientNet-B4 v1.0</strong></span>
-                <span className="text-[#047857] font-semibold">92.8% Sensitivity</span>
+                <span>{t('screening.edgeAIModel')}: <strong>{t('screening.efficientNet')}</strong></span>
+                <span className="text-[#047857] font-semibold">{t('screening.sensitivity')}</span>
               </div>
             </div>
           </section>
@@ -841,7 +935,7 @@ export default function Screening() {
             <div className="bg-white rounded-2xl border border-[#E2E7E3] p-5 sm:p-6 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#E2E7E3]">
                 <div>
-                  <span className="text-xs font-bold text-[#66756D] uppercase tracking-wider block mb-1">Target Eye Selection</span>
+                  <span className="text-xs font-bold text-[#66756D] uppercase tracking-wider block mb-1">{t('screening.targetEyeSelection')}</span>
                   <div className="inline-flex rounded-full p-1 bg-[#F8FAF7] border border-[#E2E7E3]">
                     {['OD', 'OS'].map(eye => (
                       <button key={eye} type="button" onClick={() => setActiveEye(eye)}
@@ -851,7 +945,7 @@ export default function Screening() {
                             : 'text-[#66756D] hover:text-[#20312A] hover:bg-white/80'
                         }`}>
                         <span className={`w-2 h-2 rounded-full ${activeEye === eye ? 'bg-[#14532D]' : 'bg-slate-400'}`} />
-                        <span>{eye === 'OD' ? 'OD (Right Eye)' : 'OS (Left Eye)'}</span>
+                        <span>{eye === 'OD' ? t('dashboard.rightEye') : t('dashboard.leftEye')}</span>
                       </button>
                     ))}
                   </div>
@@ -859,25 +953,20 @@ export default function Screening() {
                 <div className="flex items-center gap-2 self-start sm:self-center">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E6F4EA] text-[#047857] border border-[#047857]/20 shadow-2xs">
                     <CheckCircle2 className="w-3.5 h-3.5 text-[#047857]" />
-                    <span>{qualityScore}% GOOD</span>
+                    <span>{qualityScore}% {t('screening.good')}</span>
                   </span>
-                  <span className="text-[11px] text-[#66756D] font-medium">Ready for AI</span>
+                  <span className="text-[11px] text-[#66756D] font-medium">{t('screening.readyForAI')}</span>
                 </div>
               </div>
 
               {/* LAYER TOGGLES */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-[#66756D] uppercase tracking-wider">Layer:</span>
-                  <div className="bg-[#F1F5F9] p-1 rounded-lg inline-flex items-center gap-1 text-xs">
-                    {[
-                      { id: 'original', label: 'Original' },
-                      { id: 'gradcam', label: 'Grad-CAM Heatmap' },
-                      { id: 'vessel', label: 'Vessel Map' },
-                      { id: 'compare', label: 'Compare' }
-                    ].map(layer => (
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-xs font-bold text-[#66756D] uppercase tracking-wider shrink-0">{t('screening.layer')}:</span>
+                  <div className="bg-[#F1F5F9] p-1 rounded-lg flex items-center gap-1 text-xs overflow-x-auto max-w-full">
+                    {LAYER_OPTIONS.map(layer => (
                       <button key={layer.id} type="button" onClick={() => setActiveLayer(layer.id)}
-                        className={`px-3 py-1 rounded-md text-xs transition-all cursor-pointer font-medium ${
+                        className={`px-3 py-1 rounded-md text-xs transition-all cursor-pointer font-medium whitespace-nowrap shrink-0 ${
                           activeLayer === layer.id ? 'bg-white shadow-sm text-[#20312A] font-semibold' : 'text-[#66756D] hover:text-[#20312A]'
                         }`}>
                         {layer.label}
@@ -886,7 +975,7 @@ export default function Screening() {
                   </div>
                 </div>
                 <span className="text-[11px] text-[#475569] font-medium">
-                  {activeEye} · 45° Field · {activeLayer.toUpperCase()}
+                  {activeEye} · 45° {t('screening.field')} · {activeLayer.toUpperCase()}
                 </span>
               </div>
 
@@ -896,8 +985,8 @@ export default function Screening() {
                   <div className="flex flex-col items-center justify-center gap-3 text-center px-6">
                     <ImageOff className="w-12 h-12 text-slate-600" />
                     <div>
-                      <p className="text-sm font-semibold text-slate-300">No fundus image captured yet</p>
-                      <p className="text-xs text-slate-500 mt-1">Use Capture Image or Upload from Device below to begin</p>
+                      <p className="text-sm font-semibold text-slate-300">{t('screening.noFundusImage')}</p>
+                      <p className="text-xs text-slate-500 mt-1">{t('screening.useCaptureOrUpload')}</p>
                     </div>
                   </div>
                 ) : (
@@ -907,13 +996,13 @@ export default function Screening() {
                   {activeLayer === 'gradcam' && heatmapUrl ? (
                     <img
                       src={apiAssetUrl(heatmapUrl)}
-                      alt="Grad-CAM Heatmap"
+                      alt={t('screening.gradcamHeatmap')}
                       className="w-full h-full object-contain"
                     />
                   ) : (activeLayer === 'original' || activeLayer === 'vessel' || activeLayer === 'compare') && fundusImageUrl ? (
                     <img
                       src={apiAssetUrl(fundusImageUrl)}
-                      alt="Fundus Photo"
+                      alt={t('screening.fundusPhoto')}
                       className="w-full h-full object-contain"
                     />
                   ) : (
@@ -979,7 +1068,7 @@ export default function Screening() {
                 {/* Overlay label */}
                 <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-xs text-white px-3 py-1.5 rounded-xl border border-slate-700/60 text-xs font-medium">
                   <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-                  <span>{activeEye} • 45° Field • {activeLayer.toUpperCase()}</span>
+                  <span>{activeEye} • 45° {t('screening.field')} • {activeLayer.toUpperCase()}</span>
                 </div>
 
                 {/* Zoom Controls */}
@@ -994,7 +1083,7 @@ export default function Screening() {
                   <button type="button" onClick={() => { setHasImage(false); setUploadedFile(null); setAiResult(null); setScreeningStep('capture'); setZoomLevel(1.0) }}
                     className="bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-md">
                     <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Retake</span>
+                    <span>{t('screening.retake')}</span>
                   </button>
                 </div>
                 </>
@@ -1007,12 +1096,12 @@ export default function Screening() {
                   <button type="button" onClick={() => cameraInputRef.current?.click()}
                     className="btn-gradient-pill min-h-[44px] h-12 px-5 text-sm font-bold shadow-xs hover:brightness-105 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 cursor-pointer focus:outline-none">
                     <Camera className="w-5 h-5 text-[#14532D]" />
-                    <span>Capture Image</span>
+                    <span>{t('screening.captureImage')}</span>
                   </button>
                   <button type="button" onClick={() => fileInputRef.current?.click()}
                     className="min-h-[44px] h-12 px-5 bg-white hover:bg-[#E6F4EA] text-[#20312A] font-semibold text-sm rounded-xl border border-[#E2E7E3] shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer">
                     <Upload className="w-5 h-5 text-slate-500" />
-                    <span>Upload from Device</span>
+                    <span>{t('screening.uploadFromDevice')}</span>
                   </button>
                 </div>
               ) : (
@@ -1020,12 +1109,12 @@ export default function Screening() {
                   <button type="button" onClick={() => { setHasImage(false); setUploadedFile(null); setAiResult(null); setScreeningStep('capture'); setZoomLevel(1.0) }}
                     className="min-h-[44px] h-12 px-5 bg-white hover:bg-[#E6F4EA] text-[#20312A] font-semibold text-sm rounded-xl border border-[#E2E7E3] shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer">
                     <RotateCcw className="w-4 h-4 text-slate-600" />
-                    <span>Retake Image</span>
+                    <span>{t('screening.retakeImage')}</span>
                   </button>
                   <button type="button" onClick={() => fileInputRef.current?.click()}
                     className="min-h-[44px] h-12 px-5 bg-white hover:bg-[#E6F4EA] text-[#475569] hover:text-[#20312A] font-semibold text-sm rounded-xl border border-[#E2E7E3] shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer">
                     <Upload className="w-4 h-4 text-slate-500" />
-                    <span>Upload Replacement</span>
+                    <span>{t('screening.uploadReplacement')}</span>
                   </button>
                 </div>
               )}
@@ -1033,7 +1122,7 @@ export default function Screening() {
               {activeLayer === 'gradcam' && (
                 <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
                   <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                  <span><strong>Grad-CAM Explanation:</strong> The highlighted region represents the visual attention map of the neural network. Intended for clinical assistance, not definitive lesion segmentation.</span>
+                  <span><strong>{t('screening.gradcamExplanationTitle')}:</strong> {t('screening.gradcamExplanationBody')}</span>
                 </div>
               )}
             </div>
@@ -1043,19 +1132,19 @@ export default function Screening() {
               <div className="bg-white rounded-2xl border border-[#E2E7E3] p-5 shadow-[0_2px_12px_rgba(40,89,67,0.04)] space-y-4 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between pb-3 border-b border-[#E2E7E3]">
                   <div>
-                    <h3 className="text-sm font-bold text-[#20312A] font-heading">Image Quality Check</h3>
-                    <p className="text-xs text-[#66756D] mt-0.5">Automated 4-point optical quality assessment</p>
+                    <h3 className="text-sm font-bold text-[#20312A] font-heading">{t('screening.imageQualityCheck')}</h3>
+                    <p className="text-xs text-[#66756D] mt-0.5">{t('screening.automatedQualityAssessment')}</p>
                   </div>
                   <button type="button" onClick={() => setIsQualityRejected(!isQualityRejected)}
                     className="text-[11px] font-semibold text-[#66756D] hover:text-[#20312A] underline cursor-pointer">
-                    {isQualityRejected ? 'Simulate Pass' : 'Simulate Low Quality'}
+                    {isQualityRejected ? t('screening.simulatePass') : t('screening.simulateLowQuality')}
                   </button>
                 </div>
 
                 {qualityLoading ? (
                   <div className="flex items-center justify-center py-6 gap-3 text-[#66756D] text-sm">
                     <RefreshCw className="w-5 h-5 animate-spin text-[#16866A]" />
-                    <span>Running quality check...</span>
+                    <span>{t('screening.runningQualityCheck')}</span>
                   </div>
                 ) : qualityError ? (
                   <>
@@ -1064,7 +1153,7 @@ export default function Screening() {
                       <button type="button" onClick={startAIAnalysis}
                         className="btn-gradient-pill w-full min-h-[44px] h-12 text-base font-bold shadow-md hover:shadow transition-all flex items-center justify-center gap-2.5 cursor-pointer">
                         <Sparkles className="w-5 h-5 text-[#14532D]" />
-                        <span>Run AI Analysis</span>
+                        <span>{t('screening.runAIAnalysis')}</span>
                       </button>
                     </div>
                   </>
@@ -1073,20 +1162,20 @@ export default function Screening() {
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
                       <div>
-                        <h4 className="font-bold text-xs">Image Quality Insufficient (Score: {qualityScore}/100)</h4>
-                        <p className="text-[11px] text-rose-700 mt-0.5">Cannot proceed to clinical AI analysis.</p>
+                        <h4 className="font-bold text-xs">{t('screening.imageQualityInsufficient', { score: qualityScore })}</h4>
+                        <p className="text-[11px] text-rose-700 mt-0.5">{t('screening.cannotProceedToAI')}</p>
                       </div>
                     </div>
                     <button type="button" onClick={() => { setIsQualityRejected(false); setHasImage(false); setUploadedFile(null); setScreeningStep('capture') }}
                       className="min-h-[44px] h-11 w-full bg-white hover:bg-[#E6F4EA] border border-[#E2E7E3] text-[#20312A] font-semibold rounded-xl text-xs shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer">
                       <RotateCcw className="w-4 h-4 text-slate-600" />
-                      <span>Retake Fundus Image</span>
+                      <span>{t('screening.retakeFundusImage')}</span>
                     </button>
                   </div>
                 ) : (
                   <>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                      {['Illumination', 'Retina Centered', 'Minimal Blur', 'Field of View'].map(label => (
+                      {QUALITY_LABELS.map(label => (
                         <div key={label} className="bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl p-2.5 flex items-center gap-2">
                           <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-bold text-[11px]">✓</span>
                           <span className="text-[#20312A] font-medium">{label}</span>
@@ -1097,7 +1186,7 @@ export default function Screening() {
                       <button type="button" onClick={startAIAnalysis}
                         className="btn-gradient-pill w-full min-h-[44px] h-12 text-base font-bold shadow-md hover:shadow transition-all flex items-center justify-center gap-2.5 cursor-pointer">
                         <Sparkles className="w-5 h-5 text-[#14532D]" />
-                        <span>Run AI Analysis</span>
+                        <span>{t('screening.runAIAnalysis')}</span>
                       </button>
                     </div>
                   </>
@@ -1114,17 +1203,17 @@ export default function Screening() {
                       <RefreshCw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''} text-[#A7F3D0]`} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-[#20312A] font-heading">AI Analysis Pipeline</h3>
-                      <p className="text-xs text-[#66756D]">Executing 5-stage inference · EfficientNet-B4</p>
+                      <h3 className="text-sm font-bold text-[#20312A] font-heading">{t('screening.aiAnalysisPipeline')}</h3>
+                      <p className="text-xs text-[#66756D]">{t('screening.executing5StageInference')}</p>
                     </div>
                   </div>
                   <button type="button" onClick={() => setScreeningStep('results')} className="text-xs font-semibold text-[#285943] hover:underline cursor-pointer">
-                    Skip to Results →
+                    {t('screening.skipToResults')} →
                   </button>
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-[#66756D]">Inference Progress</span>
+                    <span className="text-[#66756D]">{t('screening.inferenceProgress')}</span>
                     <span className="text-[#285943] font-mono font-bold">{analysisProgress}%</span>
                   </div>
                   <div className="w-full h-2.5 bg-[#F8FAF7] border border-[#E2E7E3] rounded-full overflow-hidden">
@@ -1132,13 +1221,7 @@ export default function Screening() {
                   </div>
                 </div>
                 <div className="divide-y divide-slate-100 border border-[#E2E7E3] rounded-xl overflow-hidden text-xs">
-                  {[
-                    '1. Image Quality Check',
-                    '2. Image Enhancement (CLAHE & Normalization)',
-                    '3. DR Classification (EfficientNet-B4)',
-                    '4. Grad-CAM Explanation Heatmap',
-                    '5. Microvascular Caliber Segmentation'
-                  ].map((label, i) => (
+                  {PIPELINE_STAGES.map((label, i) => (
                     <div key={i} className={`p-3 flex items-center justify-between ${pipelineStage > i ? 'bg-emerald-50/40' : 'bg-white opacity-70'}`}>
                       <div className="flex items-center gap-2.5">
                         <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[11px]">
@@ -1161,8 +1244,8 @@ export default function Screening() {
                   <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-[#E2E7E3] text-xs">
                     <div className="flex items-center gap-2 text-[#66756D]">
                       <Sliders className="w-3.5 h-3.5 text-[#16866A]" />
-                      <span className="font-semibold text-[#20312A]">Demo Simulator:</span>
-                      <span>Switch grade to review alternate flows:</span>
+                      <span className="font-semibold text-[#20312A]">{t('screening.demoSimulator')}:</span>
+                      <span>{t('screening.switchGradeToReview')}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       {[0, 1, 2, 3, 4].map(g => (
@@ -1180,10 +1263,10 @@ export default function Screening() {
                   <div className="flex items-center justify-between pb-3 border-b border-[#E2E7E3]">
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-[#16866A]" />
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-[#20312A] font-heading">AI-Assisted Screening Result</span>
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-[#20312A] font-heading">{t('screening.aiAssistedScreeningResult')}</span>
                     </div>
                     <span className="text-[11px] font-semibold text-[#047857] bg-[#E6F4EA] px-2.5 py-0.5 rounded-full border border-[#047857]/20">
-                      {aiResult ? 'EfficientNet-B4 · Live Result' : 'Demo Mode'}
+                      {aiResult ? `EfficientNet-B4 · ${t('screening.liveResult')}` : t('screening.demoMode')}
                     </span>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
@@ -1193,7 +1276,7 @@ export default function Screening() {
                         <h2 className="text-xl sm:text-2xl font-extrabold text-[#20312A] font-heading">{gradeInfo.title}</h2>
                       </div>
                       <p className="text-xs text-[#66756D] mt-1">
-                        Examined Eye: <strong className="text-[#20312A]">{activeEye === 'OD' ? 'Right Eye (OD)' : 'Left Eye (OS)'}</strong> · Field: 45° Non-Mydriatic
+                        {t('screening.examinedEye')}: <strong className="text-[#20312A]">{activeEye === 'OD' ? t('dashboard.rightEye') : t('dashboard.leftEye')}</strong> · {t('screening.nonMydriatic')}
                       </p>
                     </div>
                     <span className={`whitespace-nowrap inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-extrabold border shrink-0 self-start sm:self-auto ${gradeInfo.riskColor}`}>
@@ -1201,11 +1284,11 @@ export default function Screening() {
                     </span>
                   </div>
                   <div className="p-3 bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl text-xs text-[#20312A] leading-relaxed">
-                    <strong>Salient Clinical Findings:</strong> {gradeInfo.findings}
+                    <strong>{t('screening.salientClinicalFindings')}:</strong> {findingsText ?? gradeInfo.findings}
                   </div>
                   <div className="space-y-1.5 pt-1">
                     <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-[#66756D]">Diagnostic AI Confidence</span>
+                      <span className="text-[#66756D]">{t('screening.diagnosticAIConfidence')}</span>
                       <span className="text-[#20312A] font-bold font-mono">{activeConfidence}%</span>
                     </div>
                     <div className="w-full h-2 bg-[#F8FAF7] border border-[#E2E7E3] rounded-full overflow-hidden">
@@ -1214,7 +1297,7 @@ export default function Screening() {
                   </div>
                   <div className="pt-2 border-t border-[#E2E7E3] text-[11px] text-[#66756D] leading-relaxed flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-[#16866A] shrink-0 mt-0.5" />
-                    <span>AI screening supports clinical decision-making and does not replace professional diagnosis.</span>
+                    <span>{t('screening.aiScreeningSupports')}</span>
                   </div>
                 </div>
 
@@ -1223,7 +1306,7 @@ export default function Screening() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-[#20312A] font-heading flex items-center gap-2">
                       <FileText className="w-4 h-4 text-[#16866A]" />
-                      <span>Clinical Recommendation</span>
+                      <span>{t('screening.clinicalRecommendation')}</span>
                     </h3>
                     <span className="text-xs font-bold text-[#285943] bg-[#E6F4EA] px-2.5 py-1 rounded-full border border-[#047857]/20">
                       {gradeInfo.timeframe}
@@ -1239,13 +1322,15 @@ export default function Screening() {
 
                 {/* PRIMARY ACTION */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
-                  <button type="button" onClick={handleSaveScreening} disabled={isSaving}
+                  <button type="button" onClick={handleSaveScreening} disabled={isSaving || isPendingOfflineClassification}
                     className="flex-1 btn-gradient-pill min-h-[44px] h-12 px-6 text-sm font-bold shadow-sm hover:brightness-105 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100">
                     {isSaving ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Saving...</span>
+                        <span>{t('screening.saving')}</span>
                       </>
+                    ) : isPendingOfflineClassification ? (
+                      <span>{t('screening.queuedForSync')}</span>
                     ) : (
                       <span>{gradeInfo.primaryActionLabel}</span>
                     )}
@@ -1253,7 +1338,7 @@ export default function Screening() {
                   <button type="button" onClick={handleExportScreeningReport} disabled={isExportingReport}
                     className="min-h-[44px] h-12 px-4 bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold text-xs rounded-xl border border-[#E2E7E3] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
                     {isExportingReport ? <RefreshCw className="w-4 h-4 text-slate-500 animate-spin" /> : <Printer className="w-4 h-4 text-slate-500" />}
-                    <span>{isExportingReport ? 'Exporting...' : 'Print Report'}</span>
+                    <span>{isExportingReport ? t('screening.exporting') : t('screening.printReport')}</span>
                   </button>
                 </div>
               </div>

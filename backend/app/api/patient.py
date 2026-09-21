@@ -1,10 +1,12 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from app.core.database import get_db
 from app.models.patient import Patient
+from app.models.screening import Screening
+from app.services.risk_service import calculate_risk
 
 router = APIRouter()
 
@@ -57,6 +59,19 @@ class PatientResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class ScreeningHistoryItem(BaseModel):
+    screening_id: int
+    date: Optional[str]
+    dr_grade: int
+    dr_confidence: Optional[float] = None
+    fundus_image_url: Optional[str] = None
+    heatmap_url: Optional[str] = None
+    referral_recommended: bool = False
+    reviewed: bool = False
+
+    class Config:
+        from_attributes = True
+
 @router.post("/patient", response_model=PatientResponse)
 async def create_patient(data: PatientCreate, db: AsyncSession = Depends(get_db)):
     patient = Patient(**data.model_dump())
@@ -73,10 +88,6 @@ async def get_patient(patient_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Patient not found")
     return patient
 
-
-from app.services.risk_service import calculate_risk as _calc_risk
-from app.models.screening import Screening as _Screening
-
 @router.get("/patient/{patient_id}/risk")
 async def get_patient_risk(patient_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Patient).where(Patient.id == patient_id))
@@ -86,9 +97,9 @@ async def get_patient_risk(patient_id: int, db: AsyncSession = Depends(get_db)):
 
     # Get latest screening grade
     screening_result = await db.execute(
-        select(_Screening)
-        .where(_Screening.patient_id == patient_id)
-        .order_by(_Screening.created_at.desc())
+        select(Screening)
+        .where(Screening.patient_id == patient_id)
+        .order_by(Screening.created_at.desc())
     )
     latest = screening_result.scalars().first()
     dr_grade = latest.dr_grade if latest else 0
@@ -100,7 +111,34 @@ async def get_patient_risk(patient_id: int, db: AsyncSession = Depends(get_db)):
         "family_history_dr": patient.family_history_dr
     }
 
-    risk = _calc_risk(dr_grade, patient_dict)
+    risk = calculate_risk(dr_grade, patient_dict)
     risk["patient_id"] = patient_id
     risk["dr_grade"] = dr_grade
     return risk
+
+@router.get("/patient/{patient_id}/history", response_model=List[ScreeningHistoryItem])
+async def get_patient_history(patient_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Patient).where(Patient.id == patient_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    screening_result = await db.execute(
+        select(Screening)
+        .where(Screening.patient_id == patient_id)
+        .order_by(Screening.created_at.desc())
+    )
+    screenings = screening_result.scalars().all()
+    return [
+        {
+            "screening_id": s.id,
+            "date": s.created_at.isoformat() if s.created_at else None,
+            "dr_grade": s.dr_grade,
+            "dr_confidence": s.dr_confidence,
+            "fundus_image_url": s.fundus_image_url,
+            "heatmap_url": s.heatmap_url,
+            "referral_recommended": s.referral_recommended,
+            "reviewed": s.reviewed,
+        }
+        for s in screenings
+    ]
+

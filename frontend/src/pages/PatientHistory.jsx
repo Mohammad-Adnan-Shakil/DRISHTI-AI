@@ -23,10 +23,25 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import GradeBadge from '../components/GradeBadge'
+import Skeleton from '../components/Skeleton'
 import PatientHistoryPDF from '../components/PatientHistoryPDF'
-import { getPatient, getPatientHistory } from '../lib/api'
+import { apiAssetUrl, getPatient, getPatientHistory } from '../lib/api'
 import { cn, RISK_TIER_STYLES } from '../lib/utils'
 import { exportNodeToPdf, sanitizeFilenameSegment } from '../lib/pdfExport'
+
+const GRADE_LABELS = { 0: 'No DR', 1: 'Mild NPDR', 2: 'Moderate NPDR', 3: 'Severe NPDR', 4: 'Proliferative DR' }
+const GRADE_LINE_COLORS = { 0: '#047857', 1: '#B45309', 2: '#EA580C', 3: '#DC2626', 4: '#991B1B' }
+
+const formatVisitDate = (iso) => {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+const formatMonthYear = (iso) => {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+}
+
+const getImageUrl = apiAssetUrl
 
 export default function PatientHistory() {
   const navigate = useNavigate()
@@ -37,26 +52,61 @@ export default function PatientHistory() {
   // (numeric IDs from POST /api/patient) — demo/mock patient IDs have none.
   const [apiPatient, setApiPatient] = useState(null)
   const [apiScreeningHistory, setApiScreeningHistory] = useState([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [historyError, setHistoryError] = useState(null)
+  const [retryToken, setRetryToken] = useState(0)
 
   useEffect(() => {
+    setLoadingHistory(true)
+    setHistoryError(null)
+    setApiPatient(null)
+    setApiScreeningHistory([])
     if (!/^\d+$/.test(activePatientId)) {
-      setApiPatient(null)
-      setApiScreeningHistory([])
+      setHistoryError('A numeric patient ID is required to load live history.')
+      setLoadingHistory(false)
       return
     }
     let cancelled = false
-    getPatient(activePatientId)
-      .then(p => { if (!cancelled) setApiPatient(p) })
-      .catch(() => { if (!cancelled) setApiPatient(null) })
-    getPatientHistory(activePatientId)
-      .then(h => { if (!cancelled) setApiScreeningHistory(Array.isArray(h) ? h : []) })
-      .catch(() => { if (!cancelled) setApiScreeningHistory([]) })
+    Promise.all([getPatient(activePatientId), getPatientHistory(activePatientId)])
+      .then(([patient, history]) => {
+        if (cancelled) return
+        setApiPatient(patient)
+        setApiScreeningHistory(Array.isArray(history) ? history : [])
+        setLoadingHistory(false)
+      })
+      .catch(err => {
+        if (cancelled) return
+        console.error('Patient history fetch failed:', err)
+        setHistoryError('Could not load patient history. Please retry.')
+        setLoadingHistory(false)
+      })
     return () => { cancelled = true }
-  }, [activePatientId])
+  }, [activePatientId, retryToken])
 
   // Most recent screening (server already orders history by created_at desc)
   // — drives the real fundus/Grad-CAM images in VISIT 1's viewer below.
   const latestScreening = apiScreeningHistory[0] || null
+  const hasRealHistory = apiScreeningHistory.length > 0
+
+  // Chronological (oldest-first) order for the DR Grade Over Time chart.
+  const CHART_X_START = 200
+  const CHART_X_END = 680
+  const CHART_Y_ZERO = 188
+  const CHART_Y_STEP = 40
+  const chartPoints = hasRealHistory
+    ? [...apiScreeningHistory].reverse().map((s, i, arr) => ({
+        x: arr.length > 1 ? CHART_X_START + (i * (CHART_X_END - CHART_X_START)) / (arr.length - 1) : (CHART_X_START + CHART_X_END) / 2,
+        y: CHART_Y_ZERO - (s.dr_grade ?? 0) * CHART_Y_STEP,
+        grade: s.dr_grade ?? 0,
+        confidence: s.dr_confidence,
+        dateIso: s.date,
+        monthYear: formatMonthYear(s.date),
+        color: GRADE_LINE_COLORS[s.dr_grade] ?? '#047857',
+      }))
+    : []
+  const chartAreaPath = chartPoints.length > 1
+    ? `M ${chartPoints[0].x} ${CHART_Y_ZERO} L ${chartPoints.map(p => `${p.x} ${p.y}`).join(' L ')} L ${chartPoints[chartPoints.length - 1].x} ${CHART_Y_ZERO} Z`
+    : ''
 
   const [activeLayer, setActiveLayer] = useState('original') // 'original' | 'gradcam' | 'vessels'
   const [expandedVisits, setExpandedVisits] = useState({
@@ -71,8 +121,9 @@ export default function PatientHistory() {
   const pdfRef = useRef(null)
 
   // Demographics — real for API-backed patients (numeric IDs), the page's
-  // demo values otherwise. Note: the visit timeline/stat cards below have no
-  // backing history API yet, so they stay demo content either way.
+  // demo values otherwise. The visit timeline and DR Grade chart below use
+  // real screening history (getPatientHistory) when available; the summary
+  // stat cards above them stay demo content either way.
   const displayPatient = {
     name: apiPatient?.name || 'Anitha R.',
     initials: apiPatient?.name
@@ -101,30 +152,48 @@ export default function PatientHistory() {
     phc: displayPatient.phc
   }
 
-  // Mirrors the 5 visits shown in the Screening History timeline below.
-  const historyDataForPdf = [
-    { date: '14 Jan 2025', eye: 'OD', grade: 2, doctorAssessment: 'Doctor Accepted AI (Gr.2)', carePlan: 'Referral to Apex Eye Hospital' },
-    { date: '10 Oct 2024', eye: 'OS', grade: 1, doctorAssessment: 'Doctor Overrule (Gr.1)', carePlan: 'Routine 6-month follow-up' },
-    { date: '02 Jul 2024', eye: 'OD', grade: 1, doctorAssessment: 'Doctor Accepted AI (Gr.1)', carePlan: 'Routine monitoring' },
-    { date: '18 Apr 2024', eye: 'OD', grade: 1, doctorAssessment: 'Doctor Accepted AI (Gr.1)', carePlan: 'Routine monitoring' },
-    { date: '12 Jan 2024', eye: 'OS', grade: 0, doctorAssessment: 'Baseline Verified', carePlan: 'Annual re-screen' },
-  ]
+  // Dynamic history data for PDF export
+  const historyDataForPdf = hasRealHistory
+    ? apiScreeningHistory.map(s => ({
+        date: formatVisitDate(s.date),
+        eye: 'OD',
+        grade: s.dr_grade,
+        doctorAssessment: s.reviewed ? `Doctor Reviewed (Gr.${s.dr_grade})` : `AI Screened (Gr.${s.dr_grade})`,
+        carePlan: s.referral_recommended ? 'Referral Recommended' : 'Routine monitoring'
+      }))
+    : [
+        { date: '14 Jan 2025', eye: 'OD', grade: 2, doctorAssessment: 'Doctor Accepted AI (Gr.2)', carePlan: 'Referral to Apex Eye Hospital' },
+        { date: '10 Oct 2024', eye: 'OS', grade: 1, doctorAssessment: 'Doctor Overrule (Gr.1)', carePlan: 'Routine 6-month follow-up' },
+        { date: '02 Jul 2024', eye: 'OD', grade: 1, doctorAssessment: 'Doctor Accepted AI (Gr.1)', carePlan: 'Routine monitoring' },
+        { date: '18 Apr 2024', eye: 'OD', grade: 1, doctorAssessment: 'Doctor Accepted AI (Gr.1)', carePlan: 'Routine monitoring' },
+        { date: '12 Jan 2024', eye: 'OS', grade: 0, doctorAssessment: 'Baseline Verified', carePlan: 'Annual re-screen' },
+      ]
 
-  const chartDataForPdf = [
-    { date: 'Jan 2024', grade: 0 },
-    { date: 'Apr 2024', grade: 1 },
-    { date: 'Jul 2024', grade: 1 },
-    { date: 'Oct 2024', grade: 1 },
-    { date: 'Jan 2025', grade: 2 },
-  ]
+  const chartDataForPdf = hasRealHistory
+    ? chartPoints.map(p => ({ date: p.monthYear, grade: p.grade }))
+    : [
+        { date: 'Jan 2024', grade: 0 },
+        { date: 'Apr 2024', grade: 1 },
+        { date: 'Jul 2024', grade: 1 },
+        { date: 'Oct 2024', grade: 1 },
+        { date: 'Jan 2025', grade: 2 },
+      ]
 
-  const latestAssessmentForPdf = {
-    eye: 'OD',
-    date: '14 Jan 2025',
-    confidence: 94,
-    findings: 'Inferotemporal microaneurysms and early hard exudates confirmed. Grad-CAM salience concordant with ETDRS Grade 2 Moderate NPDR criteria.',
-    carePlan: 'Referred to Apex Eye Hospital (Dr. Arjun Sharma) for dilated fundus examination and optical coherence tomography within 4 weeks. Patient advised to maintain glycemic target (HbA1c < 7.0%) and monitor blood pressure bi-weekly at PHC.'
-  }
+  const latestAssessmentForPdf = hasRealHistory && latestScreening
+    ? {
+        eye: 'OD',
+        date: formatVisitDate(latestScreening.date),
+        confidence: latestScreening.dr_confidence != null ? Math.round(latestScreening.dr_confidence) : 90,
+        findings: `Grade ${latestScreening.dr_grade} (${GRADE_LABELS[latestScreening.dr_grade] || 'DR'}). Referral ${latestScreening.referral_recommended ? 'recommended' : 'not required'}.`,
+        carePlan: latestScreening.referral_recommended ? 'Referred to specialist evaluation.' : 'Annual routine follow-up recommended.'
+      }
+    : {
+        eye: 'OD',
+        date: '14 Jan 2025',
+        confidence: 94,
+        findings: 'Inferotemporal microaneurysms and early hard exudates confirmed. Grad-CAM salience concordant with ETDRS Grade 2 Moderate NPDR criteria.',
+        carePlan: 'Referred to Apex Eye Hospital (Dr. Arjun Sharma) for dilated fundus examination and optical coherence tomography within 4 weeks. Patient advised to maintain glycemic target (HbA1c < 7.0%) and monitor blood pressure bi-weekly at PHC.'
+      }
 
   const handleExportSummaryPdf = async () => {
     if (isExportingPdf) return
@@ -155,8 +224,61 @@ export default function PatientHistory() {
     }, 3500)
   }
 
+  if (loadingHistory) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A]">
+        <Navbar />
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map(item => <Skeleton key={item} className="h-20 w-full" />)}
+            </div>
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (historyError) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A]">
+        <Navbar />
+        <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div role="alert" className="bg-white rounded-xl border border-amber-200 p-8 text-center">
+            <AlertCircle className="w-10 h-10 mx-auto text-amber-600 mb-3" />
+            <h1 className="text-lg font-bold text-[#20312A]">Patient history unavailable</h1>
+            <p className="text-sm text-[#66756D] mt-2">{historyError}</p>
+            <button type="button" onClick={() => setRetryToken(value => value + 1)} className="btn-secondary mt-5 text-sm">
+              Retry
+            </button>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (apiScreeningHistory.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A]">
+        <Navbar />
+        <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+            <FileCheck className="w-10 h-10 mx-auto text-[#66756D] mb-3" />
+            <h1 className="text-lg font-bold text-[#20312A]">No screening history</h1>
+            <p className="text-sm text-[#66756D] mt-2">No screening records are available for this patient.</p>
+            <Link to="/screening" className="btn-gradient-pill mt-5 text-sm">Start New Screening</Link>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A]">
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-[9999] flex items-center gap-2 px-4 py-3 bg-[#20312A] text-white rounded-xl shadow-xl border border-[#E2E7E3] animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-auto">
@@ -317,8 +439,10 @@ export default function PatientHistory() {
             </div>
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Last Screened</span>
-              <span className="text-sm text-slate-900 mt-1 font-bold">14 Jan 2025</span>
-              <span className="text-[11px] text-slate-500">PHC Hosakote</span>
+              <span className="text-sm text-slate-900 mt-1 font-bold">
+                {hasRealHistory && latestScreening ? formatVisitDate(latestScreening.date) : '14 Jan 2025'}
+              </span>
+              <span className="text-[11px] text-slate-500">{displayPatient.phc}</span>
             </div>
           </div>
         </div>
@@ -334,8 +458,10 @@ export default function PatientHistory() {
               </div>
             </div>
             <div>
-              <span className="text-3xl font-extrabold text-[#285943] font-heading">5</span>
-              <p className="text-xs text-slate-500 mt-1">Over 3 years across PHC network</p>
+              <span className="text-3xl font-extrabold text-[#285943] font-heading">
+                {hasRealHistory ? apiScreeningHistory.length : 5}
+              </span>
+              <p className="text-xs text-slate-500 mt-1">Across PHC network</p>
             </div>
             <div className="pt-2 border-t border-slate-100 flex items-center gap-1 text-[#16866A] text-xs font-semibold">
               <CheckCircle2 className="w-4 h-4" />
@@ -352,55 +478,85 @@ export default function PatientHistory() {
               </div>
             </div>
             <div>
-              <GradeBadge grade={2} />
-              <p className="text-xs text-slate-500 mt-2">Salient microaneurysms detected</p>
+              <GradeBadge grade={hasRealHistory && latestScreening ? latestScreening.dr_grade : 2} />
+              <p className="text-xs text-slate-500 mt-2">
+                {hasRealHistory && latestScreening
+                  ? `Grade ${latestScreening.dr_grade} · ${GRADE_LABELS[latestScreening.dr_grade] ?? 'DR'}`
+                  : 'Salient microaneurysms detected'}
+              </p>
             </div>
             <div className="pt-2 border-t border-slate-100 flex items-center gap-1 text-slate-600 text-xs font-medium">
               <Award className="w-4 h-4 text-emerald-600" />
-              <span>AI Confidence: 94%</span>
+              <span>
+                AI Confidence: {hasRealHistory && latestScreening?.dr_confidence != null ? `${Math.round(latestScreening.dr_confidence)}%` : '94%'}
+              </span>
             </div>
           </div>
 
           {/* Card 3: Longitudinal Trend */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Longitudinal Trend</span>
-              <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
-                <TrendingUp className="w-4 h-4" />
+          {(() => {
+            const first = hasRealHistory && chartPoints.length > 0 ? chartPoints[0].grade : 0
+            const last = hasRealHistory && latestScreening ? latestScreening.dr_grade : 2
+            const isProg = last > first
+            const isImp = last < first
+            const trendLabel = isProg ? 'Progressive ↑' : isImp ? 'Improving ↓' : 'Stable →'
+            return (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Longitudinal Trend</span>
+                  <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <div className={cn('inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold text-xs', isProg ? 'bg-orange-100 text-orange-900' : isImp ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-100 text-slate-800')}>
+                    <span>{trendLabel}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {hasRealHistory
+                      ? `Grade ${first} → Grade ${last} (${apiScreeningHistory.length} visit${apiScreeningHistory.length !== 1 ? 's' : ''})`
+                      : 'Shifted from Grade 1 (Mild) in 2024'}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex items-center gap-1 text-orange-700 text-xs font-semibold">
+                  <Activity className="w-4 h-4" />
+                  <span>Interval: {isProg ? 'Shortened to 6 mo' : 'Standard 12 mo'}</span>
+                </div>
               </div>
-            </div>
-            <div>
-              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-100 text-orange-900 font-bold text-xs">
-                <span>Progressive ↑</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">Shifted from Grade 1 (Mild) in 2024</p>
-            </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center gap-1 text-orange-700 text-xs font-semibold">
-              <Activity className="w-4 h-4" />
-              <span>Interval: Shortened to 6 mo</span>
-            </div>
-          </div>
+            )
+          })()}
 
           {/* Card 4: Referral Status */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Referral Status</span>
-              <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
-                <Send className="w-4 h-4" />
+          {(() => {
+            const isRefRec = hasRealHistory && latestScreening ? latestScreening.referral_recommended : true
+            const isRev = hasRealHistory && latestScreening ? latestScreening.reviewed : false
+            const statusLabel = !isRefRec ? 'No Referral Needed' : isRev ? 'Reviewed by Doctor' : 'Active • Pending Review'
+            const statusBg = !isRefRec ? 'bg-emerald-100 text-emerald-900' : isRev ? 'bg-teal-100 text-teal-900' : 'bg-amber-100 text-amber-900'
+            const statusDot = !isRefRec ? 'bg-emerald-500' : isRev ? 'bg-teal-500' : 'bg-amber-500'
+            return (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 flex flex-col justify-between space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Referral Status</span>
+                  <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+                    <Send className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-bold text-xs ${statusBg}`}>
+                    <span className={`w-2 h-2 rounded-full ${statusDot}`}></span>
+                    <span>{statusLabel}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {isRefRec ? 'Dispatched to Specialist Network' : 'Routine monitoring at PHC'}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex items-center gap-1 text-xs text-slate-600 font-medium">
+                  <Building className="w-3.5 h-3.5 text-[#16866A] shrink-0" />
+                  <span className="truncate">Apex Eye Hospital, Bangalore</span>
+                </div>
               </div>
-            </div>
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold text-xs">
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                <span>Active • Pending Review</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">Dispatched to Dr. Arjun Sharma</p>
-            </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center gap-1 text-xs text-slate-600 font-medium">
-              <Building className="w-3.5 h-3.5 text-[#16866A] shrink-0" />
-              <span className="truncate">Apex Eye Hospital, Bangalore</span>
-            </div>
-          </div>
+            )
+          })()}
         </div>
 
         {/* SECTION A: DR Grade Over Time Progression */}
@@ -410,19 +566,27 @@ export default function PatientHistory() {
               <h2 id="section-progression-heading" className="text-lg font-bold text-[#20312A] font-heading">
                 DR Grade Over Time
               </h2>
-              <p className="text-xs sm:text-sm text-[#66756D]">AI-assisted screening grades across 5 longitudinal visits</p>
+              <p className="text-xs sm:text-sm text-[#66756D]">
+                {hasRealHistory
+                  ? `AI-assisted screening grades across ${chartPoints.length} longitudinal visit${chartPoints.length !== 1 ? 's' : ''}`
+                  : 'AI-assisted screening grades across 5 longitudinal visits'}
+              </p>
             </div>
             <span className="font-mono text-xs text-[#285943] bg-[#285943]/10 border border-[#285943]/20 px-2.5 py-1 rounded shadow-xs font-semibold self-start sm:self-auto">
-              Baseline: Grade 0 (Jan 2024) → Current: Grade 2 (Jan 2025)
+              {hasRealHistory && chartPoints.length > 0
+                ? `Baseline: Grade ${chartPoints[0].grade} (${chartPoints[0].monthYear}) → Current: Grade ${chartPoints[chartPoints.length - 1].grade} (${chartPoints[chartPoints.length - 1].monthYear})`
+                : 'Baseline: Grade 0 (Jan 2024) → Current: Grade 2 (Jan 2025)'}
             </span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 sm:p-7 border border-[#E2E7E3] shadow-[0_2px_12px_rgba(40,89,67,0.04)] space-y-5">
             {/* Interactive SVG Line Chart */}
             <div className="relative w-full overflow-x-auto p-4 sm:p-6 bg-[#F8FAF7]/40 rounded-xl border border-[#E2E7E3]">
-              <div className="min-w-[620px]">
+              <div className="min-w-full sm:min-w-[620px]">
                 <svg
-                  aria-label="Longitudinal DR Grade Over Time chart across 5 visits from Jan 2024 to Jan 2025"
+                  aria-label={hasRealHistory
+                    ? `Longitudinal DR Grade Over Time chart across ${chartPoints.length} visits`
+                    : 'Longitudinal DR Grade Over Time chart across 5 visits from Jan 2024 to Jan 2025'}
                   className="w-full h-64 overflow-visible"
                   fill="none"
                   viewBox="0 0 760 220"
@@ -490,84 +654,161 @@ export default function PatientHistory() {
                     </div>
                   </foreignObject>
 
-                  {/* Danger-aware area fill */}
-                  <path d="M 200 188 L 320 148 L 440 148 L 560 108 L 680 108 L 680 188 L 200 188 Z" fill="url(#chartAreaGradDanger)" />
+                  {hasRealHistory && chartPoints.length > 0 ? (
+                    <>
+                      {/* Danger-aware area fill */}
+                      {chartAreaPath && <path d={chartAreaPath} fill="url(#chartAreaGradDanger)" />}
 
-                  {/* Segmented stroke lines color-coded by severity transitions */}
-                  {/* Gr0 → Gr1: emerald to gold */}
-                  <path d="M 200 188 L 320 148" stroke="#047857" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-                  {/* Gr1 → Gr1: gold maintained */}
-                  <path d="M 320 148 L 440 148" stroke="#B45309" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-                  {/* Gr1 → Gr2: gold to orange */}
-                  <path d="M 440 148 L 560 108" stroke="#D97706" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-                  {/* Gr2 → Gr2: orange maintained */}
-                  <path d="M 560 108 L 680 108" stroke="#EA580C" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                      {/* Segmented stroke lines, colored by the arriving grade */}
+                      {chartPoints.slice(1).map((p, i) => (
+                        <path
+                          key={`seg-${i}`}
+                          d={`M ${chartPoints[i].x} ${chartPoints[i].y} L ${p.x} ${p.y}`}
+                          stroke={p.color}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="3"
+                        />
+                      ))}
 
-                  {/* Point 1: Jan 2024 (Grade 0) — emerald */}
-                  <g className="cursor-pointer">
-                    <line stroke="#E2E7E3" strokeWidth="1" x1="200" x2="200" y1="188" y2="200" />
-                    <circle cx="200" cy="188" fill="#047857" r="6" stroke="#FFFFFF" strokeWidth="2.5" />
-                  </g>
+                      {/* Points */}
+                      {chartPoints.map((p, i) => {
+                        const isLast = i === chartPoints.length - 1
+                        const tooltipX = Math.min(Math.max(p.x - 80, 165), 555)
+                        return (
+                          <g key={`pt-${i}`} className="cursor-pointer">
+                            <line
+                              stroke={isLast ? p.color : '#E2E7E3'}
+                              strokeDasharray={isLast ? '2 2' : i === 0 ? undefined : '2 2'}
+                              strokeWidth={isLast ? '1.5' : '1'}
+                              x1={p.x} x2={p.x} y1={p.y} y2="200"
+                            />
+                            {isLast && (
+                              <>
+                                <circle cx={p.x} cy={p.y} fill="none" r="14" stroke={p.color} strokeOpacity="0.20" strokeWidth="3" />
+                                <circle cx={p.x} cy={p.y} fill={p.color} fillOpacity="0.10" r="10" />
+                              </>
+                            )}
+                            <circle cx={p.x} cy={p.y} fill={p.color} r={isLast ? 6.5 : 6} stroke="#FFFFFF" strokeWidth="2.5" />
+                            {isLast && (
+                              <g className="pointer-events-none">
+                                <rect fill="#FFFFFF" stroke="#E2E7E3" strokeWidth="1" filter="drop-shadow(0 2px 8px rgba(32,49,42,0.12))" height="48" rx="8" width="160" x={tooltipX} y="44" />
+                                <text fill="#20312A" fontSize="11px" fontWeight="bold" textAnchor="middle" x={p.x} y="62">{formatVisitDate(p.dateIso)} (Latest)</text>
+                                <text fill={p.color} fontSize="10px" fontWeight="600" textAnchor="middle" x={p.x} y="80">
+                                  Grade {p.grade} · {GRADE_LABELS[p.grade] ?? 'Unknown'}{p.confidence != null ? ` · ${Math.round(p.confidence)}%` : ''}
+                                </text>
+                              </g>
+                            )}
+                          </g>
+                        )
+                      })}
 
-                  {/* Point 2: Apr 2024 (Grade 1) — gold */}
-                  <g className="cursor-pointer">
-                    <line stroke="#E2E7E3" strokeDasharray="2 2" strokeWidth="1" x1="320" x2="320" y1="148" y2="200" />
-                    <circle cx="320" cy="148" fill="#B45309" r="6" stroke="#FFFFFF" strokeWidth="2.5" />
-                  </g>
+                      {/* X-Axis Labels */}
+                      {chartPoints.map((p, i) => {
+                        const isLast = i === chartPoints.length - 1
+                        return (
+                          <text
+                            key={`lbl-${i}`}
+                            className={isLast ? 'text-[12px] font-bold' : 'text-[12px] font-medium'}
+                            fill={isLast ? p.color : '#66756D'}
+                            textAnchor="middle"
+                            x={p.x}
+                            y="214"
+                          >
+                            {p.monthYear}
+                          </text>
+                        )
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      {/* Danger-aware area fill */}
+                      <path d="M 200 188 L 320 148 L 440 148 L 560 108 L 680 108 L 680 188 L 200 188 Z" fill="url(#chartAreaGradDanger)" />
 
-                  {/* Point 3: Jul 2024 (Grade 1) — gold */}
-                  <g className="cursor-pointer">
-                    <line stroke="#E2E7E3" strokeDasharray="2 2" strokeWidth="1" x1="440" x2="440" y1="148" y2="200" />
-                    <circle cx="440" cy="148" fill="#B45309" r="6" stroke="#FFFFFF" strokeWidth="2.5" />
-                  </g>
+                      {/* Segmented stroke lines color-coded by severity transitions */}
+                      <path d="M 200 188 L 320 148" stroke="#047857" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                      <path d="M 320 148 L 440 148" stroke="#B45309" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                      <path d="M 440 148 L 560 108" stroke="#D97706" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                      <path d="M 560 108 L 680 108" stroke="#EA580C" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
 
-                  {/* Point 4: Oct 2024 (Grade 2 AI / Grade 1 Doc) — orange */}
-                  <g className="cursor-pointer">
-                    <line stroke="#E2E7E3" strokeDasharray="2 2" strokeWidth="1" x1="560" x2="560" y1="108" y2="200" />
-                    <circle cx="560" cy="108" fill="#EA580C" r="6" stroke="#FFFFFF" strokeWidth="2.5" />
-                  </g>
+                      {/* Point 1: Jan 2024 (Grade 0) — emerald */}
+                      <g className="cursor-pointer">
+                        <line stroke="#E2E7E3" strokeWidth="1" x1="200" x2="200" y1="188" y2="200" />
+                        <circle cx="200" cy="188" fill="#047857" r="6" stroke="#FFFFFF" strokeWidth="2.5" />
+                      </g>
 
-                  {/* Point 5: Jan 2025 (Latest, Grade 2) — orange with pulse ring */}
-                  <g className="cursor-pointer">
-                    <line stroke="#EA580C" strokeDasharray="2 2" strokeWidth="1.5" x1="680" x2="680" y1="108" y2="200" />
-                    <circle cx="680" cy="108" fill="none" r="14" stroke="#EA580C" strokeOpacity="0.20" strokeWidth="3" />
-                    <circle cx="680" cy="108" fill="#EA580C" fillOpacity="0.10" r="10" />
-                    <circle cx="680" cy="108" fill="#EA580C" r="6.5" stroke="#FFFFFF" strokeWidth="2.5" />
+                      {/* Point 2: Apr 2024 (Grade 1) — gold */}
+                      <g className="cursor-pointer">
+                        <line stroke="#E2E7E3" strokeDasharray="2 2" strokeWidth="1" x1="320" x2="320" y1="148" y2="200" />
+                        <circle cx="320" cy="148" fill="#B45309" r="6" stroke="#FFFFFF" strokeWidth="2.5" />
+                      </g>
 
-                    {/* Light-themed tooltip */}
-                    <g className="pointer-events-none">
-                      <rect fill="#FFFFFF" stroke="#E2E7E3" strokeWidth="1" filter="drop-shadow(0 2px 8px rgba(32,49,42,0.12))" height="48" rx="8" width="160" x="600" y="44" />
-                      <text fill="#20312A" fontSize="11px" fontWeight="bold" textAnchor="middle" x="680" y="62">Jan 2025 (Latest)</text>
-                      <text fill="#EA580C" fontSize="10px" fontWeight="600" textAnchor="middle" x="680" y="80">Grade 2 · Moderate · 94%</text>
-                    </g>
-                  </g>
+                      {/* Point 3: Jul 2024 (Grade 1) — gold */}
+                      <g className="cursor-pointer">
+                        <line stroke="#E2E7E3" strokeDasharray="2 2" strokeWidth="1" x1="440" x2="440" y1="148" y2="200" />
+                        <circle cx="440" cy="148" fill="#B45309" r="6" stroke="#FFFFFF" strokeWidth="2.5" />
+                      </g>
 
-                  {/* X-Axis Labels */}
-                  <text className="text-[12px] font-medium" fill="#66756D" textAnchor="middle" x="200" y="214">Jan 2024</text>
-                  <text className="text-[12px] font-medium" fill="#66756D" textAnchor="middle" x="320" y="214">Apr 2024</text>
-                  <text className="text-[12px] font-medium" fill="#66756D" textAnchor="middle" x="440" y="214">Jul 2024</text>
-                  <text className="text-[12px] font-medium" fill="#66756D" textAnchor="middle" x="560" y="214">Oct 2024</text>
-                  <text className="text-[12px] font-bold" fill="#EA580C" textAnchor="middle" x="680" y="214">Jan 2025</text>
+                      {/* Point 4: Oct 2024 (Grade 2 AI / Grade 1 Doc) — orange */}
+                      <g className="cursor-pointer">
+                        <line stroke="#E2E7E3" strokeDasharray="2 2" strokeWidth="1" x1="560" x2="560" y1="108" y2="200" />
+                        <circle cx="560" cy="108" fill="#EA580C" r="6" stroke="#FFFFFF" strokeWidth="2.5" />
+                      </g>
+
+                      {/* Point 5: Jan 2025 (Latest, Grade 2) — orange with pulse ring */}
+                      <g className="cursor-pointer">
+                        <line stroke="#EA580C" strokeDasharray="2 2" strokeWidth="1.5" x1="680" x2="680" y1="108" y2="200" />
+                        <circle cx="680" cy="108" fill="none" r="14" stroke="#EA580C" strokeOpacity="0.20" strokeWidth="3" />
+                        <circle cx="680" cy="108" fill="#EA580C" fillOpacity="0.10" r="10" />
+                        <circle cx="680" cy="108" fill="#EA580C" r="6.5" stroke="#FFFFFF" strokeWidth="2.5" />
+
+                        {/* Light-themed tooltip */}
+                        <g className="pointer-events-none">
+                          <rect fill="#FFFFFF" stroke="#E2E7E3" strokeWidth="1" filter="drop-shadow(0 2px 8px rgba(32,49,42,0.12))" height="48" rx="8" width="160" x="600" y="44" />
+                          <text fill="#20312A" fontSize="11px" fontWeight="bold" textAnchor="middle" x="680" y="62">Jan 2025 (Latest)</text>
+                          <text fill="#EA580C" fontSize="10px" fontWeight="600" textAnchor="middle" x="680" y="80">Grade 2 · Moderate · 94%</text>
+                        </g>
+                      </g>
+
+                      {/* X-Axis Labels */}
+                      <text className="text-[12px] font-medium" fill="#66756D" textAnchor="middle" x="200" y="214">Jan 2024</text>
+                      <text className="text-[12px] font-medium" fill="#66756D" textAnchor="middle" x="320" y="214">Apr 2024</text>
+                      <text className="text-[12px] font-medium" fill="#66756D" textAnchor="middle" x="440" y="214">Jul 2024</text>
+                      <text className="text-[12px] font-medium" fill="#66756D" textAnchor="middle" x="560" y="214">Oct 2024</text>
+                      <text className="text-[12px] font-bold" fill="#EA580C" textAnchor="middle" x="680" y="214">Jan 2025</text>
+                    </>
+                  )}
                 </svg>
               </div>
             </div>
 
             {/* Risk Trend Callout Strip + Protocol Footnote (integrated) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#FFF7ED] border border-[#EA580C]/20">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EA580C] text-white text-xs font-bold shadow-xs">
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  Risk Trend: Increasing ↑
-                </span>
-                <span className="text-xs sm:text-sm text-[#20312A] font-medium">
-                  Grade progressed from 0 to 2 over 5 visits · Specialist referral active
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[#66756D] text-[11px]">
-                <Info className="w-3.5 h-3.5 text-[#66756D] shrink-0" />
-                <span>ETDRS Standard grading protocol</span>
-              </div>
-            </div>
+            {(() => {
+              const first = hasRealHistory && chartPoints.length > 0 ? chartPoints[0].grade : 0
+              const last = hasRealHistory && chartPoints.length > 0 ? chartPoints[chartPoints.length - 1].grade : 2
+              const trendDir = !hasRealHistory ? 'up' : last > first ? 'up' : last < first ? 'down' : 'flat'
+              const trendLabel = trendDir === 'up' ? 'Increasing ↑' : trendDir === 'down' ? 'Decreasing ↓' : 'Stable →'
+              const trendBg = trendDir === 'up' ? 'bg-[#EA580C]' : trendDir === 'down' ? 'bg-[#047857]' : 'bg-slate-500'
+              const visitCount = hasRealHistory ? chartPoints.length : 5
+              const referralActive = hasRealHistory ? Boolean(latestScreening?.referral_recommended) : true
+              return (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#FFF7ED] border border-[#EA580C]/20">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${trendBg} text-white text-xs font-bold shadow-xs`}>
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      Risk Trend: {trendLabel}
+                    </span>
+                    <span className="text-xs sm:text-sm text-[#20312A] font-medium">
+                      Grade progressed from {first} to {last} over {visitCount} visit{visitCount !== 1 ? 's' : ''} · Specialist referral {referralActive ? 'active' : 'not required'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[#66756D] text-[11px]">
+                    <Info className="w-3.5 h-3.5 text-[#66756D] shrink-0" />
+                    <span>ETDRS Standard grading protocol</span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </section>
 
@@ -583,12 +824,113 @@ export default function PatientHistory() {
               </p>
             </div>
             <span className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-[#285943] text-xs font-semibold shadow-xs self-start sm:self-auto">
-              5 records · Last updated Jan 2025
+              {hasRealHistory
+                ? `${apiScreeningHistory.length} record${apiScreeningHistory.length !== 1 ? 's' : ''} · Last updated ${formatMonthYear(latestScreening?.date)}`
+                : '5 records · Last updated Jan 2025'}
             </span>
           </div>
 
           {/* Longitudinal Visits Timeline (Single Vertical Stroke, De-boxed) */}
           <div className="relative border-l-2 border-[#E2E7E3] ml-4 sm:ml-6 pl-6 sm:pl-8 space-y-6 sm:space-y-8 my-3">
+            {hasRealHistory ? apiScreeningHistory.map((s, idx) => {
+              const key = String(s.screening_id)
+              const isFirst = idx === 0
+              const isExpanded = expandedVisits[key] ?? isFirst
+              const dateObj = s.date ? new Date(s.date) : null
+              const monthShort = dateObj ? dateObj.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase() : '—'
+              const dayNum = dateObj ? dateObj.getDate() : '—'
+              const fullDate = formatVisitDate(s.date)
+              const fundusUrl = apiAssetUrl(s.fundus_image_url)
+              const heatmapUrl = apiAssetUrl(s.heatmap_url)
+              return (
+                <div className="relative group" key={key}>
+                  {/* Timeline Stroke Node Marker */}
+                  <div className={`absolute -left-[31px] sm:-left-[39px] top-4 w-4 h-4 rounded-full border-2 border-white shadow-xs transition-colors ${isFirst ? 'bg-[#285943] ring-4 ring-[#285943]/15' : 'bg-[#94A3B8] group-hover:bg-[#16866A] ring-4 ring-slate-100'}`} />
+
+                  {/* Clickable Header Row */}
+                  <div
+                    onClick={() => toggleVisit(key)}
+                    className="py-2.5 px-3 -mx-3 rounded-xl hover:bg-slate-100/60 transition-colors cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-start sm:items-center gap-4">
+                      {fundusUrl ? (
+                        <img src={fundusUrl} alt={`Fundus thumbnail ${fullDate}`} className="w-12 h-12 rounded-lg object-cover shrink-0 border border-slate-200 shadow-xs" />
+                      ) : (
+                        <div className={`w-12 h-12 rounded-lg flex flex-col items-center justify-center font-bold text-center shrink-0 ${isFirst ? 'bg-[#285943] text-white shadow-xs' : 'bg-slate-200/80 text-slate-700'}`}>
+                          <span className="text-[10px] uppercase opacity-75 leading-none">{monthShort}</span>
+                          <span className="text-base font-extrabold leading-tight">{dayNum}</span>
+                        </div>
+                      )}
+                      <div className="space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-base font-bold text-slate-900">{fullDate}</span>
+                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-mono text-xs font-semibold">
+                            Screening #{s.screening_id}
+                          </span>
+                          {isFirst && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#285943]/10 text-[#285943] text-xs font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#285943]"></span> Latest Visit
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {s.reviewed ? 'Reviewed by doctor' : s.referral_recommended ? 'Referral recommended · pending review' : 'Screening recorded'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 self-stretch sm:self-auto justify-between sm:justify-end">
+                      <GradeBadge grade={s.dr_grade} confidence={s.dr_confidence != null ? Math.round(s.dr_confidence) : null} />
+                      <div className="flex items-center gap-2">
+                        {s.referral_recommended && (
+                          <span className={cn('px-2.5 py-1 rounded text-xs font-semibold border', s.reviewed ? 'bg-teal-50 text-teal-800 border-teal-200' : 'bg-amber-100 text-amber-900 border-amber-200')}>
+                            {s.reviewed ? 'Reviewed' : 'Pending Review'}
+                          </span>
+                        )}
+                        <div className={`p-1 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                          <ChevronDown className="w-5 h-5" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded Inspection Panel */}
+                  {isExpanded && (
+                    <div className="pt-3 pb-2 space-y-4">
+                      <div className="flex flex-col lg:flex-row gap-5 items-start">
+                        {/* Retinal Thumbnail — real fundus/Grad-CAM image when available */}
+                        <div className="w-full lg:w-48 h-48 rounded-xl bg-slate-950 overflow-hidden border border-slate-800 shrink-0 relative shadow-sm group">
+                          {heatmapUrl ? (
+                            <img src={heatmapUrl} alt="Grad-CAM heatmap" className="w-full h-full object-cover" />
+                          ) : fundusUrl ? (
+                            <img src={fundusUrl} alt="Fundus photo" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs text-center px-3">No image on record</div>
+                          )}
+                          <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
+                            {heatmapUrl ? 'Grad-CAM' : 'Fundus'} · {fullDate}
+                          </span>
+                        </div>
+
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                          <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-1">
+                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">AI Screening Result</span>
+                            <p className="text-xs font-bold text-slate-900">Grade {s.dr_grade} · {GRADE_LABELS[s.dr_grade] ?? 'Unknown'}</p>
+                            <p className="text-xs text-slate-600">Confidence: {s.dr_confidence != null ? `${Math.round(s.dr_confidence)}%` : 'N/A'}</p>
+                          </div>
+                          <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-1">
+                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Referral Status</span>
+                            <p className="text-xs font-bold text-slate-900">{s.referral_recommended ? 'Referral Recommended' : 'No Referral Needed'}</p>
+                            <p className="text-xs text-slate-600">{s.referral_recommended ? (s.reviewed ? 'Reviewed by doctor' : 'Awaiting doctor review') : '—'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            }) : (
+            <>
             {/* VISIT 1: 14 Jan 2025 (OD) */}
             <div className="relative group">
               {/* Timeline Stroke Node Marker */}
@@ -714,7 +1056,7 @@ export default function PatientHistory() {
                         <div className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${activeLayer === 'original' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                           {latestScreening?.fundus_image_url ? (
                             <img
-                              src={`http://localhost:8000${latestScreening.fundus_image_url}`}
+                              src={getImageUrl(latestScreening.fundus_image_url)}
                               alt="Retinal fundus photo OD"
                               className="w-full h-full object-cover"
                             />
@@ -744,7 +1086,7 @@ export default function PatientHistory() {
                         <div className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${activeLayer === 'gradcam' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                           {latestScreening?.heatmap_url ? (
                             <img
-                              src={`http://localhost:8000${latestScreening.heatmap_url}`}
+                              src={getImageUrl(latestScreening.heatmap_url)}
                               alt="Grad-CAM heatmap"
                               className="w-full h-full object-cover"
                             />
@@ -1265,6 +1607,8 @@ export default function PatientHistory() {
                 </div>
               )}
             </div>
+            </>
+            )}
           </div>
         </section>
       </main>

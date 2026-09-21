@@ -16,7 +16,7 @@ import DoctorNavbar from '../components/DoctorNavbar'
 import GradeBadge from '../components/GradeBadge'
 import Skeleton from '../components/Skeleton'
 import { handleZoomIn, handleZoomOut, handleZoomReset } from '../lib/zoomHandlers'
-import { markPatientScreeningsReviewed, getPatient, getPendingScreenings } from '../lib/api'
+import { apiAssetUrl, markPatientScreeningsReviewed, getPatient, getPendingScreenings } from '../lib/api'
 
 const GRADE_LABELS = { 0: 'No DR', 1: 'Mild NPDR', 2: 'Moderate NPDR', 3: 'Severe NPDR', 4: 'Proliferative DR' }
 
@@ -32,55 +32,64 @@ export default function DoctorReview() {
   const navigate = useNavigate()
   const patientId = id || 'DRI-2026-00419'
 
-  // Real, API-backed data — only available for numeric patient IDs (reached
-  // from a queue built off getPendingScreenings()). Demo/mock IDs fall back
-  // to the page's original static content below.
+  // Real, API-backed data is required for the review workspace.
   const [apiPatient, setApiPatient] = useState(null)
   const [apiScreening, setApiScreening] = useState(null)
   const [loadingReview, setLoadingReview] = useState(true)
+  const [reviewError, setReviewError] = useState(null)
+  const [retryToken, setRetryToken] = useState(0)
 
   useEffect(() => {
+    setLoadingReview(true)
+    setReviewError(null)
+    setApiPatient(null)
+    setApiScreening(null)
     if (!/^\d+$/.test(patientId)) {
-      setApiPatient(null)
-      setApiScreening(null)
+      setReviewError('This review does not have a live numeric patient record.')
       setLoadingReview(false)
       return
     }
     let cancelled = false
-    setLoadingReview(true)
     Promise.allSettled([getPatient(patientId), getPendingScreenings()]).then(([pRes, sRes]) => {
       if (cancelled) return
-      if (pRes.status === 'fulfilled') setApiPatient(pRes.value)
-      if (sRes.status === 'fulfilled' && Array.isArray(sRes.value)) {
-        const match = sRes.value.find(s => String(s.patient_id) === patientId)
-        setApiScreening(match ?? null)
+      if (pRes.status !== 'fulfilled' || sRes.status !== 'fulfilled' || !Array.isArray(sRes.value)) {
+        setReviewError('Could not load review data. Please retry.')
+        setLoadingReview(false)
+        return
       }
+      const match = sRes.value.find(s => String(s.patient_id) === patientId)
+      if (!pRes.value || !match) {
+        setReviewError('No pending screening data is available for this patient.')
+        setLoadingReview(false)
+        return
+      }
+      setApiPatient(pRes.value)
+      setApiScreening(match)
       setLoadingReview(false)
     })
     return () => { cancelled = true }
-  }, [patientId])
+  }, [patientId, retryToken])
 
   const displayReview = {
-    name: apiPatient?.name || 'Ravi T.',
+    name: apiPatient?.name ?? null,
     initials: apiPatient?.name
       ? apiPatient.name.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
-      : 'RT',
+      : null,
     ageGender: apiPatient?.age != null && apiPatient?.gender
       ? `${apiPatient.age} yrs, ${apiPatient.gender}`
-      : '58 yrs, Male',
-    phc: apiPatient?.phc_id || 'PHC Chelur',
-    diabetesDuration: apiPatient?.diabetes_duration_years != null ? `${apiPatient.diabetes_duration_years} Years` : '12 Years',
-    hba1c: apiPatient?.hba1c_level != null ? `${apiPatient.hba1c_level}%` : '8.4%',
-    hypertension: apiPatient ? (apiPatient.hypertension ? 'Yes' : 'No') : 'Yes',
-    grade: apiScreening?.dr_grade ?? 4,
-    confidence: apiScreening?.dr_confidence ?? 91,
-    findings: apiScreening?.recommendation_text ||
-      'Model attention concentrated on regions suggestive of neovascularization and preretinal hemorrhage patterns in the superior temporal area.',
+      : null,
+    phc: apiPatient?.phc_id ?? null,
+    diabetesDuration: apiPatient?.diabetes_duration_years != null ? `${apiPatient.diabetes_duration_years} Years` : null,
+    hba1c: apiPatient?.hba1c_level != null ? `${apiPatient.hba1c_level}%` : null,
+    hypertension: apiPatient ? (apiPatient.hypertension ? 'Yes' : 'No') : null,
+    grade: apiScreening?.dr_grade ?? null,
+    confidence: apiScreening?.dr_confidence ?? null,
+    findings: apiScreening?.recommendation_text ?? null,
     capturedAt: apiScreening?.created_at
       ? new Date(apiScreening.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-      : 'Today, 7:55 AM',
-    fundusUrl: apiScreening?.fundus_image_url ? `http://localhost:8000${apiScreening.fundus_image_url}` : null,
-    heatmapUrl: apiScreening?.heatmap_url ? `http://localhost:8000${apiScreening.heatmap_url}` : null,
+      : null,
+    fundusUrl: apiAssetUrl(apiScreening?.fundus_image_url),
+    heatmapUrl: apiAssetUrl(apiScreening?.heatmap_url),
   }
   const urgencyLabel = getUrgencyLabel(displayReview.grade)
   const gradeLabel = GRADE_LABELS[displayReview.grade] ?? 'Unknown'
@@ -112,6 +121,7 @@ export default function DoctorReview() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDraftSaved, setIsDraftSaved] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
 
   // Zoom handlers (using shared utility)
   const zoomIn = () => handleZoomIn(setZoomLevel)
@@ -149,6 +159,7 @@ export default function DoctorReview() {
     }
 
     setOverrideError('')
+    setSubmitError(null)
     setIsSubmitting(true)
 
     const toast = isAiAgreed
@@ -164,13 +175,16 @@ export default function DoctorReview() {
       }
     } catch (err) {
       console.error('Failed to mark screening(s) reviewed:', err)
-    } finally {
       setIsSubmitting(false)
-      setToastMessage(toast)
-      setTimeout(() => {
-        navigate('/doctor-dashboard')
-      }, 1200)
+      setSubmitError('Could not submit this review. The screening remains pending. Please retry.')
+      return
     }
+
+    setIsSubmitting(false)
+    setToastMessage(toast)
+    setTimeout(() => {
+      navigate('/doctor-dashboard')
+    }, 1200)
   }
 
   const handleSaveDraft = () => {
@@ -190,9 +204,49 @@ export default function DoctorReview() {
     }
   }
 
+  if (loadingReview) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] antialiased">
+        <DoctorNavbar />
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          <Skeleton className="h-24 w-full" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Skeleton className="h-96 w-full" />
+            <Skeleton className="h-96 w-full" />
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (reviewError) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] antialiased">
+        <DoctorNavbar />
+        <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div role="alert" className="bg-white rounded-xl border border-amber-200 p-8 text-center">
+            <AlertCircle className="w-10 h-10 mx-auto text-amber-600 mb-3" />
+            <h1 className="text-lg font-bold">Review data unavailable</h1>
+            <p className="text-sm text-[#66756D] mt-2">{reviewError}</p>
+            <button type="button" onClick={() => setRetryToken(value => value + 1)} className="btn-secondary mt-5 text-sm">Retry</button>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] antialiased selection:bg-[#E6F4EA] selection:text-[#047857] pb-12 relative">
       <DoctorNavbar />
+
+      {submitError && (
+        <div role="alert" className="mx-auto mt-4 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+            <span>{submitError}</span>
+          </div>
+        </div>
+      )}
 
       {/* SUCCESS TOAST NOTIFICATION */}
       {toastMessage && (
@@ -383,7 +437,13 @@ export default function DoctorReview() {
                   className="relative w-full h-full flex items-center justify-center transition-transform duration-200"
                   style={{ transform: `scale(${zoomLevel})` }}
                 >
-                  {activeLayer === 'original' && displayReview.fundusUrl ? (
+                  {activeLayer === 'vessel' ||
+                  (activeLayer === 'original' && !displayReview.fundusUrl) ||
+                  (activeLayer === 'gradcam' && !displayReview.heatmapUrl) ? (
+                    <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm text-center px-6">
+                      No image is available for this layer.
+                    </div>
+                  ) : activeLayer === 'original' && displayReview.fundusUrl ? (
                     <img
                       src={displayReview.fundusUrl}
                       alt="Fundus Photo"

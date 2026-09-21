@@ -1,15 +1,20 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const apiUrl = (env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
+  const apiUrlPattern = new RegExp(`^${apiUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/api/`, 'i')
+
+  return {
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['favicon.svg'],
       manifest: {
         name: 'DRISHTI Clinical AI',
         short_name: 'DRISHTI',
@@ -43,7 +48,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/drishti-ai-69kp\.onrender\.com\/api\/.*/i,
+            urlPattern: apiUrlPattern,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
@@ -58,4 +63,5 @@ export default defineConfig({
       }
     })
   ],
+  }
 })

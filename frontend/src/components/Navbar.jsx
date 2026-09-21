@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Eye, LogOut, ChevronDown, Building2 } from 'lucide-react'
+import { LogOut, ChevronDown, Building2 } from 'lucide-react'
 import OfflineBanner from './OfflineBanner'
+import { clearSession } from '../lib/auth'
+import { useTranslation } from 'react-i18next'
 
 export default function Navbar({
   facilityName = 'PHC Hosakote',
@@ -9,6 +11,7 @@ export default function Navbar({
   workerRole = 'Health Worker',
   workerInitials = 'KN',
 }) {
+  const { t, i18n } = useTranslation()
   const location = useLocation()
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
@@ -36,7 +39,7 @@ export default function Navbar({
           <div className="flex items-center gap-3">
             <Link to="/dashboard" className="flex items-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-[#16866A] rounded-md p-1">
               <div className="rounded-full p-2.5 bg-gradient-to-br from-[#E6F4EA] to-[#CCFBF1] flex items-center justify-center shadow-xs">
-                <Eye className="w-5 h-5 text-[#047857]" strokeWidth={2} />
+                <img src="/drishti-logo.png" alt="DRISHTI" style={{ height: '32px', width: '32px' }} className="rounded-full object-cover" />
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
@@ -70,14 +73,15 @@ export default function Navbar({
               ) : (
                 <span className="w-2 h-2 rounded-full bg-[#B91C1C] mr-1.5" />
               )}
-              <span>{isOnline ? 'Online' : 'Offline'}</span>
+              <span>{isOnline ? t('common.online') : t('common.offline')}</span>
             </div>
 
             <div className="relative hidden sm:block">
               <select
-                aria-label="Select interface language"
+                aria-label={t('nav.selectInterfaceLanguage')}
                 className="text-xs bg-[#F8FAF7] border border-[#E2E7E3] text-[#20312A] py-1.5 pl-2.5 pr-7 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-[#16866A] appearance-none cursor-pointer"
-                defaultValue="en"
+                value={i18n.language}
+                onChange={(e) => i18n.changeLanguage(e.target.value)}
               >
                 <option value="en">English</option>
                 <option value="kn">ಕನ್ನಡ (Kannada)</option>
@@ -103,8 +107,9 @@ export default function Navbar({
 
             <Link
               to="/login"
-              aria-label="Sign out"
-              title="Sign out"
+              onClick={clearSession}
+              aria-label={t('nav.signOut')}
+              title={t('nav.signOut')}
               className="p-1.5 text-[#66756D] hover:text-[#20312A] hover:bg-[#F8FAF7] rounded-md focus:outline-none focus:ring-2 focus:ring-[#16866A] transition-colors"
             >
               <LogOut className="w-4 h-4" strokeWidth={2} />
@@ -115,9 +120,9 @@ export default function Navbar({
 
       <div className="bg-[#F8FAF7] border-t border-[#E2E7E3]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1.5 h-10 overflow-x-auto py-1">
-          <Link to="/dashboard" className={isDashboard ? 'nav-active-pill' : 'nav-inactive-pill'}>Dashboard</Link>
-          <Link to="/screening" className={isScreening ? 'nav-active-pill' : 'nav-inactive-pill'}>New Screening</Link>
-          <Link to="/register" className={isRegister ? 'nav-active-pill' : 'nav-inactive-pill'}>Register Patient</Link>
+          <Link to="/dashboard" className={isDashboard ? 'nav-active-pill' : 'nav-inactive-pill'}>{t('nav.dashboard')}</Link>
+          <Link to="/screening" className={isScreening ? 'nav-active-pill' : 'nav-inactive-pill'}>{t('nav.newScreening')}</Link>
+          <Link to="/register" className={isRegister ? 'nav-active-pill' : 'nav-inactive-pill'}>{t('nav.registerPatient')}</Link>
         </div>
       </div>
 

@@ -10,6 +10,7 @@ import Skeleton from '../components/Skeleton'
 import { cn } from '../lib/utils'
 import { getScreeningStats, getPendingScreenings } from '../lib/api'
 import { getQueueCount } from '../lib/db'
+import { useTranslation } from 'react-i18next'
 
 function getConfidenceBarColor(confidence) {
   if (confidence >= 90) return 'bg-[#059669]'
@@ -20,6 +21,7 @@ function getConfidenceBarColor(confidence) {
 // Card for a single patient in the "Needs Attention" section — styled red for
 // urgent (grade >= 3) referrals, amber for routine referral review.
 function NeedsAttentionCard({ item }) {
+  const { t } = useTranslation()
   const isPriority = item.grade >= 3
   const Icon = isPriority ? AlertTriangle : Send
 
@@ -33,8 +35,8 @@ function NeedsAttentionCard({ item }) {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-base text-[#20312A]">{item.name}</span>
             <span className="text-xs font-medium text-[#475569] font-mono">{item.id}</span>
-            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-[#475569] border border-slate-200">{item.eye === 'OS' ? 'OS (Left Eye)' : 'OD (Right Eye)'}</span>
-            {isPriority && <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#EF4444] text-white uppercase tracking-wider">PRIORITY</span>}
+            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-[#475569] border border-slate-200">{item.eye === 'OS' ? t('dashboard.leftEye') : t('dashboard.rightEye')}</span>
+            {isPriority && <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-[#EF4444] text-white uppercase tracking-wider">{t('dashboard.priority')}</span>}
           </div>
           <span className="text-xs font-medium text-[#475569] whitespace-nowrap">{item.time}</span>
         </div>
@@ -45,21 +47,21 @@ function NeedsAttentionCard({ item }) {
             isPriority ? 'text-[#DC2626] bg-red-100/80 border-[#EF4444]/30' : 'text-[#B45309] bg-amber-100/80 border-[#F59E0B]/30'
           )}>
             <Icon className={cn('w-3.5 h-3.5', isPriority ? 'text-[#DC2626]' : 'text-[#D97706]')} />
-            {isPriority ? 'Urgent Referral' : 'Referral Pending Doctor Review'}
+            {isPriority ? t('dashboard.urgentReferral') : t('dashboard.referralPendingDoctorReview')}
           </span>
         </div>
         <div className={cn('flex items-center gap-1.5 text-xs font-medium', isPriority ? 'text-[#DC2626]' : 'text-[#B45309]')}>
           <Clock className={cn('w-3.5 h-3.5', isPriority ? 'text-[#EF4444]' : 'text-[#D97706]')} />
-          <span>{isPriority ? 'Action needed today: Contact patient & organize transit' : 'Awaiting tele-ophthalmology verification (within 14 days)'}</span>
+          <span>{isPriority ? t('dashboard.actionNeededToday') : t('dashboard.awaitingTeleOphthalmology')}</span>
         </div>
       </div>
       <div className={cn('flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 border-t gap-2 mt-auto', isPriority ? 'border-[#EF4444]/20' : 'border-[#F59E0B]/20')}>
-        <span className="text-xs text-[#475569] hidden sm:inline">{isPriority ? 'Escalation target: District Eye Hospital' : 'Taluk Hospital / Tele-Ophthalmology'}</span>
+        <span className="text-xs text-[#475569] hidden sm:inline">{isPriority ? t('dashboard.escalationTarget') : t('dashboard.talukHospital')}</span>
         <Link to={`/history/${item.id}`} className={cn(
           'min-h-[36px] inline-flex items-center justify-center px-4 py-2 text-xs font-semibold bg-white active:scale-[0.98] rounded-xl border focus:outline-none transition-colors cursor-pointer shadow-2xs',
           isPriority ? 'text-[#EF4444] hover:bg-red-50 border-[#EF4444]/35' : 'text-[#D97706] hover:bg-amber-50 border-[#F59E0B]/35'
         )}>
-          View Patient →
+          {t('dashboard.viewPatient')} →
         </Link>
       </div>
     </div>
@@ -67,6 +69,7 @@ function NeedsAttentionCard({ item }) {
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const today = new Date()
   const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -74,9 +77,16 @@ export default function Dashboard() {
   const [recentScreenings, setRecentScreenings] = useState([])
   const [needsAttention, setNeedsAttention] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     async function fetchData() {
+      setLoading(true)
+      setError(null)
+      setStats(null)
+      setRecentScreenings([])
+      setNeedsAttention([])
       try {
         const [statsData, pendingData, queueCount] = await Promise.allSettled([
           getScreeningStats(),
@@ -84,44 +94,83 @@ export default function Dashboard() {
           getQueueCount()
         ])
 
-        setStats(prev => {
-          const next = { total_screenings: 0, total_referrals: 0, pending_sync: 0, total_patients: 0, ...prev }
-          if (statsData.status === 'fulfilled' && statsData.value) {
-            const s = statsData.value
-            next.total_screenings = s.total_screenings ?? next.total_screenings
-            next.total_referrals = s.referrals_recommended ?? next.total_referrals
-            next.total_patients = s.total_patients ?? next.total_patients
-          }
-          // Pending Sync comes from the local offline queue (IndexedDB), not
-          // the backend — it works even when the backend is unreachable.
-          if (queueCount.status === 'fulfilled') {
-            next.pending_sync = queueCount.value
-          }
-          return next
-        })
+        if (statsData.status === 'fulfilled' && statsData.value) {
+          setStats({
+            total_screenings: statsData.value.total_screenings,
+            total_referrals: statsData.value.referrals_recommended,
+            pending_sync: queueCount.status === 'fulfilled' ? queueCount.value : null,
+            total_patients: statsData.value.total_patients,
+          })
+        }
 
-        if (pendingData.status === 'fulfilled' && pendingData.value?.length > 0) {
+        if (pendingData.status === 'fulfilled') {
           // Map /api/screenings/pending response to display format
           const mapped = pendingData.value.map(s => ({
-            id: s.patient_id ?? 'DRI-2026-00000',
-            name: s.patient_name || 'Patient',
-            time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:-- AM',
-            eye: s.eye || 'OD',
+            id: s.patient_id ?? s.screening_id,
+            name: s.patient_name || t('dashboard.unnamedPatient'),
+            time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            eye: s.eye || 'N/A',
             grade: s.dr_grade ?? 0,
-            confidence: s.dr_confidence ?? 90,
+            confidence: s.dr_confidence ?? null,
             status: s.referral_recommended ? 'referral-created' : 'screening-complete'
           }))
           setRecentScreenings(mapped.slice(0, 5))
           setNeedsAttention(mapped.slice(0, 2))
         }
+        const failures = [
+          statsData.status === 'rejected' ? t('dashboard.statsFailedLabel') : null,
+          pendingData.status === 'rejected' ? t('dashboard.pendingFailedLabel') : null,
+          queueCount.status === 'rejected' ? t('dashboard.queueFailedLabel') : null,
+        ].filter(Boolean)
+        if (failures.length > 0) {
+          setError(`${t('dashboard.couldNotLoad')} ${failures.join(` ${t('common.and')} `)}. ${t('dashboard.pleaseRetry')}`)
+        }
       } catch (err) {
-        console.error('Dashboard fetch failed, using mock data:', err)
+        console.error('Dashboard fetch failed:', err)
+        setError(t('dashboard.dashboardDataUnavailableMessage'))
       } finally {
         setLoading(false)
       }
     }
     fetchData()
+  }, [reloadToken])
+
+  // Live-update the "Pending Sync" count as screenings are queued offline or
+  // synced back, without waiting for a full dashboard refresh.
+  useEffect(() => {
+    const refreshQueueCount = async () => {
+      try {
+        const count = await getQueueCount()
+        setStats(prev => prev ? { ...prev, pending_sync: count } : prev)
+      } catch (err) {
+        console.error('Failed to refresh offline queue count:', err)
+      }
+    }
+    const handleQueued = () => refreshQueueCount()
+    const handleDequeued = () => refreshQueueCount()
+    window.addEventListener('drishti:offline-queued', handleQueued)
+    window.addEventListener('drishti:offline-dequeued', handleDequeued)
+    return () => {
+      window.removeEventListener('drishti:offline-queued', handleQueued)
+      window.removeEventListener('drishti:offline-dequeued', handleDequeued)
+    }
   }, [])
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A]">
+        <Navbar />
+        <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div role="alert" className="bg-white rounded-xl border border-amber-200 p-8 text-center">
+            <AlertTriangle className="w-10 h-10 mx-auto text-amber-600 mb-3" />
+            <h1 className="text-lg font-bold">{t('dashboard.dashboardDataUnavailable')}</h1>
+            <p className="text-sm text-[#66756D] mt-2">{error}</p>
+            <button type="button" onClick={() => setReloadToken(value => value + 1)} className="btn-secondary mt-5 text-sm">{t('common.retry')}</button>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A] pb-16 md:pb-0">
@@ -148,12 +197,11 @@ export default function Dashboard() {
           <Eye className="absolute -right-4 -bottom-8 w-48 h-48 text-[#16866A] opacity-[0.03] rotate-[-10deg] pointer-events-none" aria-hidden="true" />
           <div className="relative z-10 space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-heading" style={{ fontSize: 'clamp(26px, 2.5vw, 32px)', letterSpacing: '-0.02em' }}>
-              <span className="text-[#20312A]">Welcome back, </span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#285943] to-[#16866A] font-extrabold">Kavya N.</span>
+              {t('dashboard.welcomeBack')}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#285943] to-[#16866A] font-extrabold">{t('dashboard.userName')}</span>
             </h1>
             <div className="h-1 w-24 bg-gradient-to-r from-[#16866A] to-transparent rounded-full mt-3" />
             <p className="text-sm font-medium text-[#475569] flex items-center gap-1.5 pt-0.5">
-              <span>PHC Hosakote • Rural Screening Unit</span>
+              <span>{t('dashboard.phcRuralUnit')}</span>
             </p>
           </div>
           <div className="relative z-10 flex flex-wrap items-center gap-2.5 self-start sm:self-center">
@@ -166,7 +214,7 @@ export default function Dashboard() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#059669]" />
               </span>
-              <span>Shift Active</span>
+              <span>{t('dashboard.shiftActive')}</span>
             </div>
           </div>
         </div>
@@ -180,34 +228,34 @@ export default function Dashboard() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-lg sm:text-xl font-bold text-[#20312A] font-heading">Start a New Screening</h2>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#E6F4EA] text-[#047857] border border-[#047857]/20">Primary Flow</span>
+                  <h2 className="text-lg sm:text-xl font-bold text-[#20312A] font-heading">{t('dashboard.startNewScreening')}</h2>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#E6F4EA] text-[#047857] border border-[#047857]/20">{t('dashboard.primaryFlow')}</span>
                 </div>
-                <p className="text-sm text-[#475569] mt-1 max-w-2xl leading-relaxed">Select or register a patient and begin retinal screening. DRISHTI will guide you through image capture, quality check and screening results.</p>
+                <p className="text-sm text-[#475569] mt-1 max-w-2xl leading-relaxed">{t('dashboard.screeningDescription')}</p>
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
               <Link to="/screening" className="min-h-[44px] px-5 py-2.5 rounded-xl btn-gradient-pill text-[#14532D] font-bold shadow-xs hover:brightness-105 hover:shadow-md transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 cursor-pointer focus:outline-none">
                 <ScanEye className="w-4 h-4 text-[#14532D]" />
-                <span>+ New Screening</span>
+                <span>+ {t('nav.newScreening')}</span>
               </Link>
               <Link to="/register" className="min-h-[44px] px-4 py-2.5 rounded-xl bg-white hover:bg-[#E6F4EA] border border-[#E2E7E3] text-[#20312A] text-sm font-semibold transition-all cursor-pointer inline-flex items-center justify-center gap-2 shadow-xs">
                 <UserPlus className="w-4 h-4 text-[#475569]" />
-                <span>Register Patient</span>
+                <span>{t('dashboard.registerPatient')}</span>
               </Link>
             </div>
           </div>
         </section>
 
         {/* STAT CARDS */}
-        <section aria-label="Clinical Metrics Overview">
+        <section aria-label={t('dashboard.clinicalMetricsOverview')}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            <StatCard title="Today's Screenings" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_screenings ?? 0)} subtitle="Completed at PHC Hosakote" icon={Eye} accentColor="teal" />
-            <StatCard title="Referrals Today" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_referrals ?? 0)} subtitle="Sent to District Eye Hospital" icon={Send} accentColor="amber">
-              <span className="text-xs font-semibold text-[#B45309] bg-amber-50 px-2 py-0.5 rounded-full border border-[#F59E0B]/30">Requires follow-up</span>
+            <StatCard title={t('dashboard.todaysScreenings')} value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_screenings ?? 'N/A')} subtitle={t('dashboard.completedAtPHC')} icon={Eye} accentColor="teal" />
+            <StatCard title={t('dashboard.referralsToday')} value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_referrals ?? 'N/A')} subtitle={t('dashboard.sentToDistrictEyeHospital')} icon={Send} accentColor="amber">
+              <span className="text-xs font-semibold text-[#B45309] bg-amber-50 px-2 py-0.5 rounded-full border border-[#F59E0B]/30">{t('dashboard.requiresFollowUp')}</span>
             </StatCard>
-            <StatCard title="Pending Sync" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.pending_sync ?? 0)} subtitle="Screenings waiting to sync" icon={Users} accentColor="slate" />
-            <StatCard title="Total Patients" value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_patients ?? 0)} subtitle="Registered at PHC Hosakote" icon={Users} accentColor="forest" />
+            <StatCard title={t('dashboard.pendingSync')} value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.pending_sync ?? 'N/A')} subtitle={t('dashboard.screeningsWaitingToSync')} icon={Users} accentColor="slate" />
+            <StatCard title={t('dashboard.totalPatients')} value={loading ? <Skeleton className="h-8 w-12" /> : String(stats?.total_patients ?? 'N/A')} subtitle={t('dashboard.registeredAtPHC')} icon={Users} accentColor="forest" />
           </div>
         </section>
 
@@ -216,13 +264,13 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h2 id="needs-attention-heading" className="text-base sm:text-lg font-bold text-[#20312A] font-heading">Needs Attention</h2>
+                <h2 id="needs-attention-heading" className="text-base sm:text-lg font-bold text-[#20312A] font-heading">{t('dashboard.needsAttention')}</h2>
                 <span className="w-2 h-2 rounded-full bg-[#EF4444] animate-pulse" />
               </div>
-              <p className="text-xs sm:text-sm text-[#475569]">Patients requiring follow-up</p>
+              <p className="text-xs sm:text-sm text-[#475569]">{t('dashboard.patientsRequiringFollowUp')}</p>
             </div>
             {!loading && (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-[#EF4444] border border-[#EF4444]/25">{needsAttention.length} action item{needsAttention.length === 1 ? '' : 's'}</span>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-[#EF4444] border border-[#EF4444]/25">{needsAttention.length} {t('dashboard.actionItems')}</span>
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -247,17 +295,17 @@ export default function Dashboard() {
         <section aria-labelledby="recent-screenings-heading" className="pt-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 id="recent-screenings-heading" className="text-base sm:text-lg font-bold text-[#20312A] font-heading">Recent Screenings</h2>
-              <p className="text-xs sm:text-sm text-[#475569]">Recently screened patients at PHC Hosakote</p>
+              <h2 id="recent-screenings-heading" className="text-base sm:text-lg font-bold text-[#20312A] font-heading">{t('dashboard.recentScreenings')}</h2>
+              <p className="text-xs sm:text-sm text-[#475569]">{t('dashboard.recentlyScreenedPatients')}</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-xs font-medium text-[#475569] hidden sm:inline-flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
-                <span>{loading ? 'Loading...' : 'Live from database'}</span>
+                <span>{loading ? t('common.loading') : t('dashboard.liveFromDatabase')}</span>
               </div>
               <span className="text-slate-300 hidden sm:inline">•</span>
               <Link to="/doctor-dashboard" className="text-xs sm:text-sm font-semibold text-[#285943] hover:text-[#16866A] flex items-center gap-1 focus:outline-none rounded px-2 py-1 transition-colors">
-                <span>View All</span>
+                <span>{t('dashboard.viewAll')}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -268,13 +316,13 @@ export default function Dashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#F8FAF7] border-b border-[#E2E7E3] text-[11px] font-semibold uppercase tracking-wider text-[#475569]">
-                  <th className="py-4 px-6 font-semibold" scope="col">PATIENT</th>
-                  <th className="py-4 px-4 font-semibold" scope="col">TIME</th>
-                  <th className="py-4 px-4 font-semibold" scope="col">EYE</th>
-                  <th className="py-4 px-5 font-semibold" scope="col">AI SCREENING RESULT</th>
-                  <th className="py-4 px-4 font-semibold" scope="col">CONFIDENCE</th>
-                  <th className="py-4 px-5 font-semibold" scope="col">STATUS</th>
-                  <th className="py-4 px-6 text-right font-semibold" scope="col">ACTION</th>
+                  <th className="py-4 px-6 font-semibold" scope="col">{t('dashboard.patient')}</th>
+                  <th className="py-4 px-4 font-semibold" scope="col">{t('common.time')}</th>
+                  <th className="py-4 px-4 font-semibold" scope="col">{t('dashboard.eye')}</th>
+                  <th className="py-4 px-5 font-semibold" scope="col">{t('dashboard.aiScreeningResult')}</th>
+                  <th className="py-4 px-4 font-semibold" scope="col">{t('dashboard.confidence')}</th>
+                  <th className="py-4 px-5 font-semibold" scope="col">{t('common.status')}</th>
+                  <th className="py-4 px-6 text-right font-semibold" scope="col">{t('common.action')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E7E3] text-sm">
@@ -304,16 +352,16 @@ export default function Dashboard() {
                       <td className="py-4 px-5"><GradeBadge grade={s.grade} /></td>
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-[#20312A] font-mono min-w-[32px]">{s.confidence}%</span>
+                          <span className="text-xs font-semibold text-[#20312A] font-mono min-w-[32px]">{s.confidence != null ? `${s.confidence}%` : 'N/A'}</span>
                           <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden shrink-0">
-                            <div className={cn('h-full rounded-full transition-all duration-300', s.confidence > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]')} style={{ width: `${s.confidence}%` }} />
+                            <div className={cn('h-full rounded-full transition-all duration-300', s.confidence > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]')} style={{ width: s.confidence != null ? `${s.confidence}%` : '0%' }} />
                           </div>
                         </div>
                       </td>
                       <td className="py-4 px-5"><StatusBadge status={s.status} /></td>
                       <td className="py-4 px-6 text-right">
                         <Link to={`/history/${s.id}`} className="inline-flex items-center justify-center px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] border border-transparent hover:border-[#E2E7E3] transition-colors cursor-pointer">
-                          View
+                          {t('common.view')}
                         </Link>
                       </td>
                     </tr>
@@ -351,11 +399,11 @@ export default function Dashboard() {
                   <StatusBadge status={s.status} />
                 </div>
                 <div className="flex items-center gap-2 pt-1 border-t border-[#E2E7E3]/60">
-                  <span className="text-[11px] font-medium text-[#475569]">Confidence:</span>
+                  <span className="text-[11px] font-medium text-[#475569]">{t('dashboard.confidence')}:</span>
                   <div className="w-16 h-2 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                    <div className={cn('h-full rounded-full', getConfidenceBarColor(s.confidence))} style={{ width: `${s.confidence}%` }} />
+                    <div className={cn('h-full rounded-full', getConfidenceBarColor(s.confidence ?? 0))} style={{ width: s.confidence != null ? `${s.confidence}%` : '0%' }} />
                   </div>
-                  <span className="text-xs font-semibold text-[#20312A] font-mono">{s.confidence}%</span>
+                  <span className="text-xs font-semibold text-[#20312A] font-mono">{s.confidence != null ? `${s.confidence}%` : 'N/A'}</span>
                 </div>
               </Link>
             ))}

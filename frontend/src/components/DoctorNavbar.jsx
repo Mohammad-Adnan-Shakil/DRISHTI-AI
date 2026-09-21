@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Eye, LogOut, ChevronDown, Building2 } from 'lucide-react'
+import { LogOut, ChevronDown, Building2 } from 'lucide-react'
+import { clearSession } from '../lib/auth'
+import { useTranslation } from 'react-i18next'
 
 /**
  * DoctorNavbar – Doctor / Ophthalmologist variant
@@ -18,6 +20,7 @@ export default function DoctorNavbar({
   doctorInitials = 'AS',
   facility = 'District Eye Hospital • Tele-Retina Hub',
 }) {
+  const { t, i18n } = useTranslation()
   const location = useLocation()
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
@@ -46,7 +49,7 @@ export default function DoctorNavbar({
           <div className="flex items-center gap-3">
             <Link to="/doctor-dashboard" className="flex items-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-[#16866A] rounded-md p-1">
               <div className="rounded-full p-2.5 bg-gradient-to-br from-[#E6F4EA] to-[#CCFBF1] flex items-center justify-center shadow-xs">
-                <Eye className="w-5 h-5 text-[#047857]" strokeWidth={2} />
+                <img src="/drishti-logo.png" alt="DRISHTI" style={{ height: '32px', width: '32px' }} className="rounded-full object-cover" />
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">
@@ -83,15 +86,16 @@ export default function DoctorNavbar({
               ) : (
                 <span className="w-2 h-2 rounded-full bg-[#B91C1C] mr-1.5" />
               )}
-              <span>{isOnline ? 'Online' : 'Offline'}</span>
+              <span>{isOnline ? t('common.online') : t('common.offline')}</span>
             </div>
 
             {/* Language Selector */}
             <div className="relative hidden sm:block">
               <select
-                aria-label="Select interface language"
+                aria-label={t('nav.selectInterfaceLanguage')}
                 className="text-xs bg-[#F8FAF7] border border-[#E2E7E3] text-[#20312A] py-1.5 pl-2.5 pr-7 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-[#16866A] appearance-none cursor-pointer"
-                defaultValue="en"
+                value={i18n.language}
+                onChange={(e) => i18n.changeLanguage(e.target.value)}
               >
                 <option value="en">English</option>
                 <option value="kn">ಕನ್ನಡ (Kannada)</option>
@@ -120,8 +124,9 @@ export default function DoctorNavbar({
             {/* Logout Button */}
             <Link
               to="/login"
-              aria-label="Sign out"
-              title="Sign out"
+              onClick={clearSession}
+              aria-label={t('nav.signOut')}
+              title={t('nav.signOut')}
               className="p-1.5 text-[#66756D] hover:text-[#20312A] hover:bg-[#F8FAF7] rounded-md focus:outline-none focus:ring-2 focus:ring-[#16866A] transition-colors"
             >
               <LogOut className="w-4 h-4" strokeWidth={2} />
@@ -137,7 +142,7 @@ export default function DoctorNavbar({
             to="/doctor-dashboard"
             className={isReviewQueue ? 'nav-active-pill' : 'nav-inactive-pill'}
           >
-            Review Queue
+            {t('nav.reviewQueue')}
           </Link>
         </div>
       </div>

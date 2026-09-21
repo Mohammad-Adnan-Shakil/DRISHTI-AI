@@ -1,7 +1,7 @@
 ﻿from groq import Groq
 from app.core.config import settings
 
-client = Groq(api_key=settings.GROQ_API_KEY)
+client = None
 
 LANGUAGE_NAMES = {
     "english": "English",
@@ -29,6 +29,12 @@ RISK_ACTIONS = {
 }
 
 def generate_recommendation(dr_grade, dme_present, risk_stratification, language, patient_context):
+    global client
+    if not settings.GROQ_API_KEY or settings.GROQ_API_KEY == "your_groq_key_here":
+        raise RuntimeError("GROQ_API_KEY is not configured")
+    if client is None:
+        client = Groq(api_key=settings.GROQ_API_KEY)
+
     lang_name = LANGUAGE_NAMES.get(language, "English")
     grade_label = DR_GRADE_LABELS.get(dr_grade, "Unknown")
     action = RISK_ACTIONS.get(dr_grade, "follow-up")

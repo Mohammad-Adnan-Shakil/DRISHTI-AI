@@ -4,15 +4,15 @@
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         sync: false
       - key: GROQ_API_KEY
         sync: false
-      - key: OPENROUTER_API_KEY
+      - key: CORS_ORIGINS
         sync: false
-      - key: MODEL_PATH
-        value: ml/models/efficientnet_b4_dr.pth
+      - key: DATABASE_SSL
+        value: true
       - key: PYTHON_VERSION
         value: 3.11.9
