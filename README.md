@@ -67,6 +67,7 @@ tool that works offline, explains its decisions, and routes patients to care aut
 
 ### Backend
 - **FastAPI** (Python) — REST API
+- **JWT Authentication** — python-jose + passlib, role-based access (health_worker, doctor, admin), 24-hour token expiry
 - **NeonDB** (PostgreSQL serverless) — patient records, screenings, referrals
 - **Groq LLM** — multilingual referral recommendations (Kannada, Hindi, Tamil, Telugu, Marathi, English)
 - **Risk stratification engine** — scores Grade 0/1 patients using HbA1c, diabetes duration, hypertension, family history
@@ -75,12 +76,13 @@ tool that works offline, explains its decisions, and routes patients to care aut
 - **React + Tailwind CSS** — doctor dashboard + health worker interface
 - **PWA + Service Worker + IndexedDB** — offline-first, auto-sync when connection restored
 - **Capacitor** — Android APK build
+- **Role-based protected routes** — health_worker, doctor, admin access control
 
 ### Deployment
-- Backend → in progress
+- Backend → deployment in progress
 - Frontend → Vercel ✅ Live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app)
 - Model weights → HuggingFace Hub (`adnshkl/drishti-efficientnet-b4-dr`)
-- Android APK → built and available
+- Android APK → built (DRISHTI-AI.apk, 4.7MB)
 
 ---
 
@@ -89,7 +91,7 @@ tool that works offline, explains its decisions, and routes patients to care aut
 DRISHTI-AI/
 ├── backend/ # FastAPI REST API
 │ ├── app/
-│ │ ├── api/ # Route handlers
+│ │ ├── api/ # Route handlers + JWT auth
 │ │ ├── core/ # Config, DB connection
 │ │ ├── models/ # SQLAlchemy models
 │ │ └── services/ # ML, MATLAB, LLM, risk engine
@@ -131,8 +133,8 @@ DRISHTI-AI/
 
 | Role | Scope |
 |------|-------|
-| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, risk engine, PWA offline logic |
-| Frontend | React PWA, doctor dashboard, health worker UI |
+| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, JWT auth, risk engine, PWA offline logic |
+| Frontend | React PWA, doctor dashboard, health worker UI, role-based routing |
 
 ---
 
