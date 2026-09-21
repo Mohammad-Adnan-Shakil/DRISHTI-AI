@@ -26,3 +26,17 @@ ml/models/*.pt
 # Misc
 *.log
 .DS_Store
+static/heatmaps/*
+static/screenings/*
+static/temp/*
+static/uploads/*
+!static/heatmaps/.gitkeep
+!static/screenings/.gitkeep
+!static/temp/.gitkeep
+!static/uploads/.gitkeep
+ml/*.zip
+ml/data/
+data/
+
+drishti-keystore.jks
+.idea/
