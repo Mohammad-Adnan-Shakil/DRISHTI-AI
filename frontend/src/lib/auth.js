@@ -8,7 +8,7 @@ export const DEMO_ROLES = {
 }
 
 export async function login(username, password) {
-  const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
+  const API_URL = (import.meta.env.VITE_API_URL || 'https://lucid-giggle-dock.ngrok-free.dev').replace(/\/+$/, '')
   const res = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -53,3 +53,4 @@ export function getRoleHome(role) {
   if (role === 'admin') return '/analytics'
   return '/dashboard'
 }
+
