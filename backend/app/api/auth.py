@@ -5,8 +5,9 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
+import os
 
-SECRET_KEY = "drishti-sih-2026-secret-key-change-in-production"
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "drishti-sih-2026-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
