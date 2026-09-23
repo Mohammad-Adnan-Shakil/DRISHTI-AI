@@ -674,6 +674,10 @@ export default function Screening() {
     { id: 'original', label: t('screening.original') },
     { id: 'gradcam', label: t('screening.gradcamHeatmap') },
     { id: 'vessel', label: t('screening.vesselMap') },
+    { id: 'microaneurysm', label: 'Microaneurysms' },
+    { id: 'exudate', label: 'Exudates' },
+    { id: 'hemorrhage', label: 'Hemorrhages' },
+    { id: 'opticdisc', label: 'Optic Disc' },
     { id: 'compare', label: t('screening.compare') }
   ]
 
@@ -1015,6 +1019,14 @@ export default function Screening() {
                       alt="Vessel Map"
                       className="w-full h-full object-contain"
                     />
+                  ) : activeLayer === 'microaneurysm' && microaneurysmUrl ? (
+                    <img src={microaneurysmUrl} alt="Microaneurysms" className="w-full h-full object-contain" />
+                  ) : activeLayer === 'exudate' && exudateUrl ? (
+                    <img src={exudateUrl} alt="Exudates" className="w-full h-full object-contain" />
+                  ) : activeLayer === 'hemorrhage' && hemorrhageUrl ? (
+                    <img src={hemorrhageUrl} alt="Hemorrhages" className="w-full h-full object-contain" />
+                  ) : activeLayer === 'opticdisc' && opticDiscUrl ? (
+                    <img src={opticDiscUrl} alt="Optic Disc" className="w-full h-full object-contain" />
                   ) : activeLayer === 'original' && fundusImageUrl ? (
                     <img
                       src={apiAssetUrl(fundusImageUrl)}
