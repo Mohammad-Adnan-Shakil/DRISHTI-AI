@@ -121,6 +121,7 @@ export default function Register() {
 
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [consentGiven, setConsentGiven] = useState(false)
   const [isRegistered, setIsRegistered] = useState(false)
   const [apiError, setApiError] = useState(null)
   const [registeredId, setRegisteredId] = useState(formData.patientId)
@@ -407,13 +408,30 @@ export default function Register() {
                   </div>
                 </div>
               </div>
+                            {/* CONSENT */}
+              <div className="pt-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="consent"
+                    required
+                    className="mt-1 w-4 h-4 rounded border-[#E2E7E3] text-[#16866A] cursor-pointer"
+                    onChange={(e) => setConsentGiven(e.target.checked)}
+                  />
+                  <span className="text-xs text-[#475569] leading-relaxed">
+                    I consent to AI-assisted screening of my health data for Diabetic Retinopathy detection purposes under the Digital Personal Data Protection (DPDP) Act 2023. I understand that this screening supports clinical decision-making and does not replace professional medical diagnosis.
+                  </span>
+                </label>
+              </div>
+
+              {/* ACTIONS */}
 
               {/* ACTIONS */}
               <div className="pt-6 border-t border-[#E2E7E3] flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
                 <Link to="/dashboard" className="min-h-[44px] h-11 w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 border border-[#E2E7E3] rounded-xl text-sm font-semibold text-[#20312A] bg-white hover:bg-[#E6F4EA] shadow-xs transition-colors">
                   {t('common.cancel')}
                 </Link>
-                <button type="submit" disabled={isSubmitting}
+                  <button type="submit" disabled={isSubmitting || !consentGiven}
                   className="min-h-[44px] h-11 w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-xl btn-gradient-pill text-[#14532D] font-bold shadow-xs hover:brightness-105 hover:shadow-md active:scale-[0.98] disabled:opacity-75 focus:outline-none transition-all cursor-pointer">
                   {isSubmitting ? (
                     <><Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 text-[#14532D]" /><span>{t('register.registering')}</span></>
