@@ -3,6 +3,10 @@ from PIL import Image
 import io
 from datetime import datetime
 from pathlib import Path
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from starlette.requests import Request  
+limiter = Limiter(key_func=get_remote_address)
 from app.services.model_service import classifier
 from app.services.vessel_service import extract_vessels
 from app.services.lesion_service import run_full_lesion_analysis
@@ -15,7 +19,8 @@ FUNDUS_DIR = Path("static/screenings/fundus")
 FUNDUS_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("/classify")
-async def classify_image(file: UploadFile = File(...), token: TokenData = Depends(verify_token)):
+@limiter.limit("10/minute")
+async def classify_image(request: Request, file: UploadFile = File(...), token: TokenData = Depends(verify_token)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 

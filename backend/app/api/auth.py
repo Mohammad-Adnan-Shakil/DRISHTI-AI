@@ -8,6 +8,11 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 import os
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from starlette.requests import Request
+
+limiter = Limiter(key_func=get_remote_address)
 
 from app.core.database import get_db
 
@@ -121,7 +126,8 @@ async def create_users_table(db: AsyncSession):
 
 
 @router.post("/auth/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     # Ensure users table exists
     await create_users_table(db)
 

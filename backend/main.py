@@ -3,6 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from app.api import classify, explain, recommend, patient, screening, referral, quality, auth
 from app.core.database import engine
 from app.core.config import settings
@@ -38,6 +41,10 @@ class NgrokBypassMiddleware(BaseHTTPMiddleware):
 
 app = FastAPI(title="DRISHTI-AI", version="1.0.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(NgrokBypassMiddleware)
 app.add_middleware(

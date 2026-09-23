@@ -18,3 +18,5 @@ passlib[bcrypt]==1.7.4
 
 scikit-image==0.26.0
 
+
+slowapi==0.1.9
