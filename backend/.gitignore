@@ -1,4 +1,12 @@
-
 **/__pycache__/
 *.pyc
 *.pyo
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
