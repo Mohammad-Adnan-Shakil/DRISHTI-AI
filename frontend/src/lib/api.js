@@ -4,7 +4,7 @@
 
 // Vite replaces VITE_API_URL at build time. Keep this fallback so a clone
 // remains runnable without an environment file.
-const API_URL = (import.meta.env.VITE_API_URL || 'https://lucid-giggle-dock.ngrok-free.dev').replace(/\/+$/, '')
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
 
 export function apiAssetUrl(path) {
   if (!path) return null
@@ -179,4 +179,5 @@ export async function healthCheck() {
 export async function localHealthCheck() {
   return get(API_URL, '/health')
 }
+
 

@@ -8,10 +8,13 @@ export const DEMO_ROLES = {
 }
 
 export async function login(username, password) {
-  const API_URL = (import.meta.env.VITE_API_URL || 'https://lucid-giggle-dock.ngrok-free.dev').replace(/\/+$/, '')
-  const res = await fetch(`${API_URL}/api/auth/login`, {
+  const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
+    const res = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { 
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'ngrok-skip-browser-warning': 'true'
+    },
     body: new URLSearchParams({ username, password }),
   })
   if (!res.ok) throw new Error('Invalid credentials')
@@ -53,4 +56,5 @@ export function getRoleHome(role) {
   if (role === 'admin') return '/analytics'
   return '/dashboard'
 }
+
 
