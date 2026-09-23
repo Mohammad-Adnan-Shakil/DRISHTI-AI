@@ -10,6 +10,7 @@ from app.api import classify, explain, recommend, patient, screening, referral, 
 from app.core.database import engine
 from app.core.config import settings
 from app.services.model_service import classifier
+from app.core.logging_config import logger
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from datetime import datetime, timedelta, timezone
@@ -31,6 +32,7 @@ def cleanup_staging_files(max_age_hours: int = 24):
 
 
 cleanup_staging_files()
+
 
 class NgrokBypassMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -63,22 +65,27 @@ app.include_router(patient.router, prefix="/api")
 app.include_router(screening.router, prefix="/api")
 app.include_router(referral.router, prefix="/api")
 
+
 @app.on_event("startup")
 async def startup():
-    pass
+    logger.info("DRISHTI-AI backend starting up")
 
 
 @app.get("/health")
 async def health():
+    logger.info("Health check requested")
     database = {"available": True, "error": None}
     try:
         async with engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
     except Exception as exc:
         database = {"available": False, "error": type(exc).__name__}
+        logger.error(f"Database health check failed: {exc}")
 
     model = classifier.status()
     if not model["available"]:
         model["error"] = model["error"] or "ONNX model files are missing"
+        logger.warning("Model not loaded")
     status = "ok" if database["available"] and model["loaded"] else "degraded"
+    logger.info(f"Health check result: {status}")
     return {"status": status, "database": database, "model": model}
