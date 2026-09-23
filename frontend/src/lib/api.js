@@ -9,7 +9,10 @@ const API_URL = (import.meta.env.VITE_API_URL || 'https://lucid-giggle-dock.ngro
 export function apiAssetUrl(path) {
   if (!path) return null
   if (/^https?:\/\//i.test(path)) return path
-  return `${API_URL}${path.startsWith('/') ? path : `/${path}`}`
+  const baseUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000' 
+    : API_URL
+  return `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`
 }
 
 function getAuthHeaders(extra = {}) {

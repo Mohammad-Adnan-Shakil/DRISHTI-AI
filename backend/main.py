@@ -1,6 +1,8 @@
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from app.api import classify, explain, recommend, patient, screening, referral, quality, auth
 from app.core.database import engine
 from app.core.config import settings
@@ -9,8 +11,6 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from datetime import datetime, timedelta, timezone
 
-# Ensure static storage directories exist before the app starts serving —
-# real fundus photos and Grad-CAM heatmaps are written here.
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 Path(STATIC_DIR / "screenings/fundus").mkdir(parents=True, exist_ok=True)
 Path(STATIC_DIR / "screenings/gradcam").mkdir(parents=True, exist_ok=True)
@@ -29,9 +29,17 @@ def cleanup_staging_files(max_age_hours: int = 24):
 
 cleanup_staging_files()
 
+class NgrokBypassMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["ngrok-skip-browser-warning"] = "true"
+        return response
+
+
 app = FastAPI(title="DRISHTI-AI", version="1.0.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+app.add_middleware(NgrokBypassMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

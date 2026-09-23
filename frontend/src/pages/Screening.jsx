@@ -221,6 +221,11 @@ export default function Screening() {
   const [aiResult, setAiResult] = useState(null)
   const [heatmapUrl, setHeatmapUrl] = useState(null)
   const [fundusImageUrl, setFundusImageUrl] = useState(null)
+  const [vesselMapUrl, setVesselMapUrl] = useState(null)
+  const [microaneurysmUrl, setMicroaneurysmUrl] = useState(null)
+  const [exudateUrl, setExudateUrl] = useState(null)
+  const [hemorrhageUrl, setHemorrhageUrl] = useState(null)
+  const [opticDiscUrl, setOpticDiscUrl] = useState(null)
   const [recommendationText, setRecommendationText] = useState(null)
   // Kannada-only: Groq-generated translation of the Salient Clinical
   // Findings text (English stays as the GRADE_CONFIG default otherwise).
@@ -463,6 +468,11 @@ export default function Screening() {
         setAiResult(gradeResult)
         setSimulatedGrade(gradeResult.grade)
         setFundusImageUrl(gradeResult.fundus_image_url)
+                if (gradeResult.vessel_map_url) setVesselMapUrl(apiAssetUrl(gradeResult.vessel_map_url))
+                if (gradeResult.microaneurysm_url) setMicroaneurysmUrl(apiAssetUrl(gradeResult.microaneurysm_url))
+                if (gradeResult.exudate_url) setExudateUrl(apiAssetUrl(gradeResult.exudate_url))
+                if (gradeResult.hemorrhage_url) setHemorrhageUrl(apiAssetUrl(gradeResult.hemorrhage_url))
+                if (gradeResult.optic_disc_url) setOpticDiscUrl(apiAssetUrl(gradeResult.optic_disc_url))
       }
       setPipelineStage(3); setAnalysisProgress(60)
 
@@ -999,12 +1009,23 @@ export default function Screening() {
                       alt={t('screening.gradcamHeatmap')}
                       className="w-full h-full object-contain"
                     />
-                  ) : (activeLayer === 'original' || activeLayer === 'vessel' || activeLayer === 'compare') && fundusImageUrl ? (
+                                    ) : activeLayer === 'vessel' && vesselMapUrl ? (
+                    <img
+                      src={vesselMapUrl}
+                      alt="Vessel Map"
+                      className="w-full h-full object-contain"
+                    />
+                  ) : activeLayer === 'original' && fundusImageUrl ? (
                     <img
                       src={apiAssetUrl(fundusImageUrl)}
                       alt={t('screening.fundusPhoto')}
                       className="w-full h-full object-contain"
                     />
+                  ) : activeLayer === 'compare' && fundusImageUrl ? (
+                    <div className="relative w-full h-full">
+                      <img src={apiAssetUrl(fundusImageUrl)} alt="Original" className="w-full h-full object-contain" />
+                      {vesselMapUrl && <img src={vesselMapUrl} alt="Vessel overlay" className="absolute inset-0 w-full h-full object-contain opacity-50" />}
+                    </div>
                   ) : (
                     <svg className="w-full h-full object-cover select-none" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
                       <defs>
