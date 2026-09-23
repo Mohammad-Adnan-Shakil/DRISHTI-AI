@@ -5,40 +5,44 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 import os
+
+from app.core.database import get_db
 
 SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "drishti-sih-2026-secret-key-change-in-production")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-# Demo users — in production replace with DB lookup
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+router = APIRouter()
+
+# Fallback demo users if DB lookup fails
 DEMO_USERS = {
     "asha_worker": {
         "username": "asha_worker",
-        "password": "drishti123",
+        "password_hash": pwd_context.hash("drishti123"),
         "role": "health_worker",
         "name": "Kavya N.",
         "phc_id": "PHC Hosakote"
     },
     "dr_sharma": {
         "username": "dr_sharma",
-        "password": "drishti123",
+        "password_hash": pwd_context.hash("drishti123"),
         "role": "doctor",
-        "name": "Dr. Sharma",
+        "name": "Dr. Arjun Sharma",
         "phc_id": "PHC Hosakote"
     },
     "admin": {
         "username": "admin",
-        "password": "drishti123",
+        "password_hash": pwd_context.hash("drishti123"),
         "role": "admin",
-        "name": "Admin",
+        "name": "Admin User",
         "phc_id": "District HQ"
     },
 }
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-router = APIRouter()
 
 
 class Token(BaseModel):
@@ -89,23 +93,77 @@ def require_role(*roles):
     return checker
 
 
-@router.post("/auth/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = DEMO_USERS.get(form_data.username)
-    if not user or form_data.password != user["password"]:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+async def create_users_table(db: AsyncSession):
+    await db.execute(text("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(100) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(50) NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            phc_id VARCHAR(100),
+            created_at TIMESTAMP DEFAULT NOW()
         )
-    access_token = create_access_token(
-        data={"sub": user["username"], "role": user["role"]},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    """))
+    await db.commit()
+
+    # Seed demo users if table is empty
+    result = await db.execute(text("SELECT COUNT(*) FROM users"))
+    count = result.scalar()
+    if count == 0:
+        for user in DEMO_USERS.values():
+            await db.execute(text("""
+                INSERT INTO users (username, password_hash, role, name, phc_id)
+                VALUES (:username, :password_hash, :role, :name, :phc_id)
+                ON CONFLICT (username) DO NOTHING
+            """), user)
+        await db.commit()
+
+
+@router.post("/auth/login", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    # Ensure users table exists
+    await create_users_table(db)
+
+    # Try DB lookup first
+    try:
+        result = await db.execute(
+            text("SELECT * FROM users WHERE username = :username"),
+            {"username": form_data.username}
+        )
+        user_row = result.mappings().first()
+
+        if user_row and pwd_context.verify(form_data.password, user_row["password_hash"]):
+            access_token = create_access_token(
+                data={"sub": user_row["username"], "role": user_row["role"]},
+                expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            )
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "role": user_row["role"],
+                "name": user_row["name"],
+                "phc_id": user_row["phc_id"] or "PHC Hosakote"
+            }
+    except Exception as e:
+        # DB unavailable — fall back to demo users
+        print(f"DB login failed, using fallback: {e}")
+        demo_user = DEMO_USERS.get(form_data.username)
+        if demo_user and pwd_context.verify(form_data.password, demo_user["password_hash"]):
+            access_token = create_access_token(
+                data={"sub": demo_user["username"], "role": demo_user["role"]},
+                expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            )
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "role": demo_user["role"],
+                "name": demo_user["name"],
+                "phc_id": demo_user["phc_id"]
+            }
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect username or password",
+        headers={"WWW-Authenticate": "Bearer"},
     )
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "role": user["role"],
-        "name": user["name"],
-        "phc_id": user["phc_id"]
-    }
