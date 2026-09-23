@@ -10,6 +10,7 @@ class Patient(Base):
     age                     = Column(Integer, nullable=False)
     gender                  = Column(String, nullable=False)
     phone                   = Column(String, nullable=True)
+    email                   = Column(String, nullable=True)
     phc_id                  = Column(String, nullable=True)
     diabetes_duration_years = Column(Float, nullable=True)
     hba1c_level             = Column(Float, nullable=True)
@@ -17,8 +18,6 @@ class Patient(Base):
     family_history_dr       = Column(Boolean, default=False)
     preferred_language      = Column(String, default="english")
 
-    # Registration-time risk score (0-18) — 7 weighted clinical factors,
-    # captured at registration before any AI screening exists.
     diabetes_duration_score = Column(Integer, nullable=True)
     hba1c_score              = Column(Integer, nullable=True)
     bp_status_score          = Column(Integer, nullable=True)

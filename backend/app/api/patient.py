@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+﻿from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -15,6 +15,7 @@ class PatientCreate(BaseModel):
     age: int
     gender: str
     phone: Optional[str] = None
+    email: Optional[str] = None
     phc_id: Optional[str] = None
     diabetes_duration_years: Optional[float] = None
     hba1c_level: Optional[float] = None
@@ -22,7 +23,6 @@ class PatientCreate(BaseModel):
     family_history_dr: bool = False
     preferred_language: str = "english"
 
-    # Registration-time risk score inputs (see Register Patient "Risk Score" section)
     diabetes_duration_score: Optional[int] = None
     hba1c_score: Optional[int] = None
     bp_status_score: Optional[int] = None
@@ -39,6 +39,7 @@ class PatientResponse(BaseModel):
     age: int
     gender: str
     phone: Optional[str]
+    email: Optional[str] = None
     phc_id: Optional[str]
     diabetes_duration_years: Optional[float]
     hba1c_level: Optional[float]
@@ -95,7 +96,6 @@ async def get_patient_risk(patient_id: int, db: AsyncSession = Depends(get_db)):
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    # Get latest screening grade
     screening_result = await db.execute(
         select(Screening)
         .where(Screening.patient_id == patient_id)
@@ -141,4 +141,3 @@ async def get_patient_history(patient_id: int, db: AsyncSession = Depends(get_db
         }
         for s in screenings
     ]
-

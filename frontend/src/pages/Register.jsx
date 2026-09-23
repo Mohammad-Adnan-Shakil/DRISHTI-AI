@@ -156,6 +156,7 @@ export default function Register() {
     try {
       const result = await createPatient({
         name: formData.fullName,
+        email: formData.email || null,
         age: parseInt(formData.age),
         gender: formData.gender,
         phc_id: formData.phcId,
@@ -267,6 +268,12 @@ export default function Register() {
                     <input id="age" type="number" min="1" max="120" placeholder={t('register.agePlaceholder')} value={formData.age} onChange={(e) => handleInputChange('age', e.target.value)}
                       className={`touch-target w-full h-11 rounded-xl border px-3.5 text-sm text-[#20312A] placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] transition-all ${errors.age ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E2E7E3] bg-white'}`} />
                     {errors.age && <div className="text-xs text-[#DC2626] mt-1.5 flex items-center gap-1 font-medium"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /><span>{errors.age}</span></div>}
+                  </div>
+                                    <div>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="email">Email Address <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <input id="email" type="email" placeholder="patient@example.com" value={formData.email || ''} onChange={(e) => handleInputChange('email', e.target.value)}
+                      className="touch-target w-full h-11 rounded-xl border px-3.5 text-sm text-[#20312A] placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] transition-all border-[#E2E7E3] bg-white" />
+                    <p className="text-[11px] text-[#66756D] mt-1">Used to send screening results to patient or guardian</p>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="gender">{t('register.gender')} <span className="text-rose-600 font-bold">*</span></label>
