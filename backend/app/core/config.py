@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     MODEL_PATH: str = "models/efficientnet_b4_dr.onnx"
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
     DATABASE_SSL: bool = True
+    JWT_SECRET_KEY: str = "drishti-sih-2026-secret-key-change-in-production"
 
     @property
     def model_path(self) -> Path:

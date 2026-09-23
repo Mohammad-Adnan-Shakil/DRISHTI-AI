@@ -4,6 +4,7 @@ import io
 from datetime import datetime
 from pathlib import Path
 from app.services.model_service import classifier
+from app.services.vessel_service import extract_vessels
 from fastapi import Depends
 from app.api.auth import verify_token, TokenData
 
@@ -21,9 +22,7 @@ async def classify_image(file: UploadFile = File(...), token: TokenData = Depend
     image = Image.open(io.BytesIO(contents)).convert("RGB")
     result = classifier.predict(image)
 
-    # Persist the uploaded fundus photo so the frontend can display the
-    # real image (screening page, doctor review, patient history) instead
-    # of a placeholder.
+    # Save fundus image
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
     safe_filename = Path(file.filename or "upload.jpg").name
     saved_filename = f"{timestamp}_{safe_filename}"
@@ -32,5 +31,16 @@ async def classify_image(file: UploadFile = File(...), token: TokenData = Depend
         f.write(contents)
 
     result["fundus_image_url"] = f"/static/screenings/fundus/{saved_filename}"
-    return result
 
+    # Run vessel segmentation
+    try:
+        vessel_result = extract_vessels(str(saved_path))
+        result["vessel_map_url"] = vessel_result["vessel_map_url"]
+        result["vessel_mask_url"] = vessel_result["vessel_mask_url"]
+        result["vessel_density"] = vessel_result["vessel_density"]
+    except Exception as e:
+        result["vessel_map_url"] = None
+        result["vessel_mask_url"] = None
+        result["vessel_density"] = None
+
+    return result
