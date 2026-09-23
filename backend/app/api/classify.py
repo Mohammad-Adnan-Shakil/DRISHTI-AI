@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from app.services.model_service import classifier
 from app.services.vessel_service import extract_vessels
+from app.services.lesion_service import run_full_lesion_analysis
 from fastapi import Depends
 from app.api.auth import verify_token, TokenData
 
@@ -33,6 +34,7 @@ async def classify_image(file: UploadFile = File(...), token: TokenData = Depend
     result["fundus_image_url"] = f"/static/screenings/fundus/{saved_filename}"
 
     # Run vessel segmentation
+        # Run vessel segmentation
     try:
         vessel_result = extract_vessels(str(saved_path))
         result["vessel_map_url"] = vessel_result["vessel_map_url"]
@@ -42,5 +44,22 @@ async def classify_image(file: UploadFile = File(...), token: TokenData = Depend
         result["vessel_map_url"] = None
         result["vessel_mask_url"] = None
         result["vessel_density"] = None
+
+    # Run full lesion analysis
+    try:
+        lesion_result = run_full_lesion_analysis(str(saved_path))
+        result["microaneurysm_url"] = lesion_result.get("microaneurysm_url")
+        result["microaneurysm_count"] = lesion_result.get("microaneurysm_count", 0)
+        result["exudate_url"] = lesion_result.get("exudate_url")
+        result["exudate_area_percent"] = lesion_result.get("exudate_area_percent", 0)
+        result["hemorrhage_url"] = lesion_result.get("hemorrhage_url")
+        result["hemorrhage_count"] = lesion_result.get("hemorrhage_count", 0)
+        result["optic_disc_url"] = lesion_result.get("optic_disc_url")
+        result["optic_disc_center"] = lesion_result.get("optic_disc_center")
+    except Exception as e:
+        result["microaneurysm_url"] = None
+        result["exudate_url"] = None
+        result["hemorrhage_url"] = None
+        result["optic_disc_url"] = None
 
     return result
