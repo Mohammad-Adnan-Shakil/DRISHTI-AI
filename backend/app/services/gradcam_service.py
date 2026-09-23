@@ -1,88 +1,127 @@
-from datetime import datetime
-from pathlib import Path
-
 import numpy as np
+import torch
+import torch.nn as nn
 from PIL import Image
+from pathlib import Path
+import uuid
+import timm
 
-from app.services.model_service import classifier
+GRADCAM_DIR = Path("static/screenings/gradcam")
+GRADCAM_DIR.mkdir(parents=True, exist_ok=True)
 
-HEATMAP_DIR = Path("static/screenings/gradcam")
-HEATMAP_DIR.mkdir(parents=True, exist_ok=True)
+MODEL_PATH = Path("models/efficientnet_b4_dr.pth")
 
-INPUT_SIZE = 380
-PATCH_SIZE = 76
+# Global model cache — load once, reuse
+_model = None
+_hooks = {}
 
+def _get_model():
+    global _model
+    if _model is not None:
+        return _model
 
-def _softmax(logits: np.ndarray) -> np.ndarray:
-    exp = np.exp(logits - np.max(logits))
-    return exp / exp.sum()
+    model = timm.create_model('efficientnet_b4', pretrained=False, num_classes=5)
+    state = torch.load(MODEL_PATH, map_location='cpu', weights_only=False)
 
+    # Handle different checkpoint formats
+    if isinstance(state, dict) and 'model_state_dict' in state:
+        state = state['model_state_dict']
+    elif isinstance(state, dict) and 'state_dict' in state:
+        state = state['state_dict']
 
-def _predict_probs(session, tensor: np.ndarray) -> np.ndarray:
-    logits = session.run(None, {"input": tensor})[0][0]
-    return _softmax(logits)
+    try:
+        model.load_state_dict(state, strict=True)
+    except RuntimeError:
+        model.load_state_dict(state, strict=False)
 
-
-def show_cam_on_image(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    # Jet colormap via numpy (replaces cv2.applyColorMap)
-    mask_clipped = np.clip(mask, 0, 1)
-    r = np.clip(1.5 - np.abs(4 * mask_clipped - 3), 0, 1)
-    g = np.clip(1.5 - np.abs(4 * mask_clipped - 2), 0, 1)
-    b = np.clip(1.5 - np.abs(4 * mask_clipped - 1), 0, 1)
-    heatmap = np.stack([r, g, b], axis=2).astype(np.float32)
-    overlay = heatmap + 0.5 * image
-    overlay = overlay / np.max(overlay)
-    return (overlay * 255).astype(np.uint8)
+    model.eval()
+    _model = model
+    return model
 
 
 def generate_gradcam(image_path: str, target_grade: int = None) -> dict:
-    pil_img = Image.open(image_path).convert("RGB").resize((INPUT_SIZE, INPUT_SIZE), Image.BILINEAR)
-    rgb_img = np.array(pil_img, dtype=np.float32) / 255.0
+    """
+    True Grad-CAM using PyTorch backprop through EfficientNet-B4.
+    Highlights regions that drove the DR grade prediction.
+    """
+    model = _get_model()
 
-    session = classifier.session
-    base_tensor = classifier.preprocess(pil_img)
+    # Preprocess image
+    pil_img = Image.open(image_path).convert("RGB").resize((380, 380))
+    img_array = np.array(pil_img, dtype=np.float32) / 255.0
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    img_norm = (img_array - mean) / std
+    img_tensor = torch.FloatTensor(img_norm).permute(2, 0, 1).unsqueeze(0)
 
-    baseline_probs = _predict_probs(session, base_tensor)
-    if target_grade is None:
-        target_grade = int(np.argmax(baseline_probs))
-    baseline_score = baseline_probs[target_grade]
+    # Hook storage
+    gradients = []
+    activations = []
 
-    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
-    std  = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
-    gray_value = ((0.5 - mean) / std).astype(np.float32)
+    def forward_hook(module, input, output):
+        activations.append(output.detach())
 
-    grid_size = INPUT_SIZE // PATCH_SIZE
-    saliency = np.zeros((grid_size, grid_size), dtype=np.float32)
+    def backward_hook(module, grad_input, grad_output):
+        gradients.append(grad_output[0].detach())
 
-    for row in range(grid_size):
-        y0, y1 = row * PATCH_SIZE, (row + 1) * PATCH_SIZE
-        for col in range(grid_size):
-            x0, x1 = col * PATCH_SIZE, (col + 1) * PATCH_SIZE
-            occluded = base_tensor.copy()
-            occluded[0, :, y0:y1, x0:x1] = gray_value
-            probs = _predict_probs(session, occluded)
-            saliency[row, col] = max(0.0, baseline_score - probs[target_grade])
+    # Register hooks on last conv block
+    target_layer = model.blocks[-1]
+    fwd_handle = target_layer.register_forward_hook(forward_hook)
+    bwd_handle = target_layer.register_full_backward_hook(backward_hook)
 
-    if saliency.max() > 0:
-        saliency = saliency / saliency.max()
+    # Forward pass
+    img_tensor.requires_grad = True
+    output = model(img_tensor)
+    pred_class = output.argmax(dim=1).item()
+    target = target_grade if target_grade is not None else pred_class
+    score = output[0, target]
 
-    # Resize saliency map with Pillow (replaces cv2.resize)
-    saliency_pil = Image.fromarray((saliency * 255).astype(np.uint8)).resize(
-        (INPUT_SIZE, INPUT_SIZE), Image.BICUBIC
+    # Backward pass
+    model.zero_grad()
+    score.backward()
+
+    # Remove hooks
+    fwd_handle.remove()
+    bwd_handle.remove()
+
+    # Generate Grad-CAM heatmap
+    grads = gradients[0].squeeze()      # [C, H, W]
+    acts = activations[0].squeeze()     # [C, H, W]
+
+    # Global average pool gradients
+    weights = grads.mean(dim=(1, 2))    # [C]
+    cam = (weights[:, None, None] * acts).sum(dim=0)  # [H, W]
+    cam = torch.relu(cam)
+
+    # Normalize
+    cam = cam.numpy()
+    if cam.max() > 0:
+        cam = cam / cam.max()
+
+    # Resize to original image size
+    cam_pil = Image.fromarray((cam * 255).astype(np.uint8)).resize(
+        (pil_img.width, pil_img.height), Image.BILINEAR
     )
-    grayscale_cam = np.array(saliency_pil, dtype=np.float32) / 255.0
-    grayscale_cam = np.clip(grayscale_cam, 0, 1)
+    cam_np = np.array(cam_pil, dtype=np.float32) / 255.0
 
-    cam_image = show_cam_on_image(rgb_img, grayscale_cam)
+    # Apply colormap (jet-like: blue→green→red)
+    heatmap = np.zeros((*cam_np.shape, 3), dtype=np.float32)
+    heatmap[:, :, 0] = np.clip(1.5 - abs(cam_np * 4 - 3), 0, 1)  # R
+    heatmap[:, :, 1] = np.clip(1.5 - abs(cam_np * 4 - 2), 0, 1)  # G
+    heatmap[:, :, 2] = np.clip(1.5 - abs(cam_np * 4 - 1), 0, 1)  # B
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
-    heatmap_filename = f"{timestamp}_gradcam.jpg"
-    heatmap_path = str(HEATMAP_DIR / heatmap_filename)
-    Image.fromarray(cam_image).save(heatmap_path, quality=95)
+    # Blend with original
+    original = np.array(pil_img, dtype=np.float32) / 255.0
+    blended = 0.5 * original + 0.5 * heatmap
+    blended = np.clip(blended * 255, 0, 255).astype(np.uint8)
+
+    # Save
+    filename = f"{uuid.uuid4().hex}_gradcam_true.jpg"
+    save_path = str(GRADCAM_DIR / filename)
+    Image.fromarray(blended).save(save_path, quality=95)
 
     return {
-        "heatmap_path": heatmap_path,
-        "heatmap_url": f"/static/screenings/gradcam/{heatmap_filename}",
-        "target_grade": target_grade,
-        "cam_intensity": float(np.mean(grayscale_cam))
+        "heatmap_url": f"/static/screenings/gradcam/{filename}",
+        "predicted_class": pred_class,
+        "method": "grad-cam"
     }
