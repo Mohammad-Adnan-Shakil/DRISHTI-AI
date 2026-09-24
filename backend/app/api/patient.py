@@ -71,6 +71,14 @@ class ScreeningHistoryItem(BaseModel):
     heatmap_url: Optional[str] = None
     referral_recommended: bool = False
     reviewed: bool = False
+    microaneurysm_count: Optional[int] = 0
+    microaneurysm_url: Optional[str] = None
+    exudate_area_percent: Optional[float] = 0.0
+    exudate_url: Optional[str] = None
+    hemorrhage_count: Optional[int] = 0
+    hemorrhage_url: Optional[str] = None
+    optic_disc_center: Optional[List[int]] = None
+    optic_disc_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -140,6 +148,14 @@ async def get_patient_history(patient_id: int, db: AsyncSession = Depends(get_db
             "heatmap_url": s.heatmap_url,
             "referral_recommended": s.referral_recommended,
             "reviewed": s.reviewed,
+            "microaneurysm_count": s.microaneurysm_count if s.microaneurysm_count is not None else 0,
+            "microaneurysm_url": s.microaneurysm_url,
+            "exudate_area_percent": s.exudate_area_percent if s.exudate_area_percent is not None else 0.0,
+            "exudate_url": s.exudate_url,
+            "hemorrhage_count": s.hemorrhage_count if s.hemorrhage_count is not None else 0,
+            "hemorrhage_url": s.hemorrhage_url,
+            "optic_disc_center": s.optic_disc_center,
+            "optic_disc_url": s.optic_disc_url,
         }
         for s in screenings
     ]

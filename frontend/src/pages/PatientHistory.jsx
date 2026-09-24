@@ -1159,6 +1159,74 @@ export default function PatientHistory() {
                         </div>
                       </div>
 
+                      {/* BLOCK 1.5: Lesion Biomarkers (Real API Fields: microaneurysm_count, exudate_area_percent, hemorrhage_count, optic_disc_center) */}
+                      <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-1.5">
+                            <Layers className="w-4 h-4 text-[#285943]" />
+                            <span className="text-xs font-bold text-[#20312A] uppercase tracking-tight">Detected Lesion Biomarkers</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-[#E6F4EA] text-[#047857] text-[11px] font-semibold border border-[#A7F3D0]">
+                            ML Pipeline Data
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {/* Microaneurysms */}
+                          <div className="p-2.5 rounded-lg bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col justify-between">
+                            <span className="text-[10px] text-[#66756D] uppercase tracking-wider font-semibold">Microaneurysms</span>
+                            <div className="flex items-baseline gap-1 mt-1">
+                              <span className={`text-base font-bold font-mono ${(latestScreening?.microaneurysm_count ?? 0) > 0 ? 'text-rose-700' : 'text-[#20312A]'}`}>
+                                {latestScreening?.microaneurysm_count != null ? latestScreening.microaneurysm_count : 0}
+                              </span>
+                              <span className="text-[11px] text-[#66756D]">
+                                {(latestScreening?.microaneurysm_count ?? 0) === 0 ? 'none detected' : 'detected'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Hemorrhages */}
+                          <div className="p-2.5 rounded-lg bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col justify-between">
+                            <span className="text-[10px] text-[#66756D] uppercase tracking-wider font-semibold">Hemorrhages</span>
+                            <div className="flex items-baseline gap-1 mt-1">
+                              <span className={`text-base font-bold font-mono ${(latestScreening?.hemorrhage_count ?? 0) > 0 ? 'text-red-700' : 'text-[#20312A]'}`}>
+                                {latestScreening?.hemorrhage_count != null ? latestScreening.hemorrhage_count : 0}
+                              </span>
+                              <span className="text-[11px] text-[#66756D]">
+                                {(latestScreening?.hemorrhage_count ?? 0) === 0 ? 'none detected' : 'detected'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Exudates */}
+                          <div className="p-2.5 rounded-lg bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col justify-between">
+                            <span className="text-[10px] text-[#66756D] uppercase tracking-wider font-semibold">Exudate Area</span>
+                            <div className="flex items-baseline gap-1 mt-1">
+                              <span className={`text-sm font-bold font-mono ${(latestScreening?.exudate_area_percent ?? 0) > 0 ? 'text-amber-800' : 'text-[#20312A]'}`}>
+                                {latestScreening?.exudate_area_percent != null && latestScreening.exudate_area_percent > 0
+                                  ? `${latestScreening.exudate_area_percent}%`
+                                  : '0%'}
+                              </span>
+                              <span className="text-[11px] text-[#66756D]">
+                                {(latestScreening?.exudate_area_percent ?? 0) > 0 ? 'coverage' : 'none detected'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Optic Disc */}
+                          <div className="p-2.5 rounded-lg bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col justify-between">
+                            <span className="text-[10px] text-[#66756D] uppercase tracking-wider font-semibold">Optic Disc</span>
+                            <div className="mt-1 truncate">
+                              <span className={`text-xs font-bold font-mono ${latestScreening?.optic_disc_center ? 'text-teal-800' : 'text-[#20312A]'}`}>
+                                {latestScreening?.optic_disc_center
+                                  ? `[${Array.isArray(latestScreening.optic_disc_center) ? latestScreening.optic_disc_center.join(', ') : latestScreening.optic_disc_center}]`
+                                  : 'None detected'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* BLOCK 2: Doctor Clinical Assessment (Authoritative Block) */}
                       <div className="p-4 rounded-xl bg-white border border-slate-200 border-l-4 border-l-[#0D9488] shadow-sm space-y-3">
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100">

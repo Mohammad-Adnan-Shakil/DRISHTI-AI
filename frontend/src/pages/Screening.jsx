@@ -666,7 +666,15 @@ export default function Screening() {
       risk_stratification: gradeInfo.risk,
       referral_recommended: activeGrade >= 2,
       recommendation_text: recommendationText ?? gradeInfo.recommendation,
-      recommendation_language: reportLanguage
+      recommendation_language: reportLanguage,
+      microaneurysm_count: aiResult?.microaneurysm_count ?? 0,
+      microaneurysm_url: aiResult?.microaneurysm_url ?? null,
+      exudate_area_percent: aiResult?.exudate_area_percent ?? 0.0,
+      exudate_url: aiResult?.exudate_url ?? null,
+      hemorrhage_count: aiResult?.hemorrhage_count ?? 0,
+      hemorrhage_url: aiResult?.hemorrhage_url ?? null,
+      optic_disc_center: aiResult?.optic_disc_center ?? null,
+      optic_disc_url: aiResult?.optic_disc_url ?? null
     }
     const offlineKey = [
       selectedPatient.realId,

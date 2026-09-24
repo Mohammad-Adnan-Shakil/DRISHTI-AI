@@ -64,13 +64,18 @@ function dedupeByPatientAndTime(records) {
 function mapScreeningRows(rows) {
   return rows.map(s => ({
     id: s.patient_id ?? s.id ?? s.screening_id,
+    screeningId: s.screening_id ?? s.id,
     name: s.patient_name || s.name || 'Unnamed patient',
     phc: s.phc_id || 'N/A',
     drGrade: s.dr_grade ?? 0,
     confidence: s.dr_confidence != null ? `${s.dr_confidence}%` : 'N/A',
     time: s.created_at ? new Date(s.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A',
     urgency: getUrgency(s.dr_grade ?? 0),
-    railColor: getRailColor(s.dr_grade ?? 0)
+    railColor: getRailColor(s.dr_grade ?? 0),
+    microaneurysm_count: s.microaneurysm_count ?? 0,
+    exudate_area_percent: s.exudate_area_percent ?? 0.0,
+    hemorrhage_count: s.hemorrhage_count ?? 0,
+    optic_disc_center: s.optic_disc_center ?? null,
   }))
 }
 
@@ -280,6 +285,7 @@ export default function DoctorDashboard() {
                   <th scope="col" className="py-3.5 px-3">PHC Unit</th>
                   <th scope="col" className="py-3.5 px-3">AI Screening Result</th>
                   <th scope="col" className="py-3.5 px-3 text-center">Confidence</th>
+                  <th scope="col" className="py-3.5 px-3">Lesions & Biomarkers</th>
                   <th scope="col" className="py-3.5 px-3">Time</th>
                   <th scope="col" className="py-3.5 px-3">Urgency</th>
                   <th scope="col" className="py-3.5 pl-3 pr-5 text-right">Action</th>
@@ -293,6 +299,7 @@ export default function DoctorDashboard() {
                       <td className="py-3.5 px-3"><Skeleton className="h-3 w-24" /></td>
                       <td className="py-3.5 px-3"><Skeleton className="h-5 w-16" /></td>
                       <td className="py-3.5 px-3"><Skeleton className="h-4 w-16" /></td>
+                      <td className="py-3.5 px-3"><Skeleton className="h-4 w-36 mb-1" /><Skeleton className="h-3 w-28" /></td>
                       <td className="py-3.5 px-3"><Skeleton className="h-3 w-14" /></td>
                       <td className="py-3.5 px-3"><Skeleton className="h-4 w-16" /></td>
                       <td className="py-3.5 pl-3 pr-5 text-right"><Skeleton className="h-6 w-16 ml-auto" /></td>
@@ -312,6 +319,60 @@ export default function DoctorDashboard() {
                           <span className="font-mono text-xs font-semibold text-[#20312A] min-w-[32px]">{item.confidence}</span>
                           <div className="h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden shrink-0">
                             <div className={`h-full rounded-full ${parseInt(item.confidence) > 90 ? 'bg-[#10B981]' : 'bg-[#F59E0B]'}`} style={{ width: item.confidence }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <div className="flex flex-col gap-1 min-w-[210px]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border ${
+                                item.microaneurysm_count > 0
+                                  ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                  : 'bg-[#F8FAF7] text-[#66756D] border-[#E2E7E3]'
+                              }`}
+                              title="Microaneurysm Count (microaneurysm_count)"
+                            >
+                              <span className="font-semibold mr-1">MA:</span>
+                              {item.microaneurysm_count > 0 ? item.microaneurysm_count : '0 (none detected)'}
+                            </span>
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border ${
+                                item.hemorrhage_count > 0
+                                  ? 'bg-red-50 text-red-800 border-red-200'
+                                  : 'bg-[#F8FAF7] text-[#66756D] border-[#E2E7E3]'
+                              }`}
+                              title="Hemorrhage Count (hemorrhage_count)"
+                            >
+                              <span className="font-semibold mr-1">Hem:</span>
+                              {item.hemorrhage_count > 0 ? item.hemorrhage_count : '0 (none detected)'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border ${
+                                item.exudate_area_percent > 0
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-[#F8FAF7] text-[#66756D] border-[#E2E7E3]'
+                              }`}
+                              title="Exudate Area (exudate_area_percent)"
+                            >
+                              <span className="font-semibold mr-1">Exudates:</span>
+                              {item.exudate_area_percent > 0 ? `${item.exudate_area_percent}% area` : '0% (none detected)'}
+                            </span>
+                            <span
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium border ${
+                                item.optic_disc_center
+                                  ? 'bg-teal-50 text-teal-800 border-teal-200'
+                                  : 'bg-[#F8FAF7] text-[#66756D] border-[#E2E7E3]'
+                              }`}
+                              title="Optic Disc Localization (optic_disc_center)"
+                            >
+                              <span className="font-semibold mr-1">Optic Disc:</span>
+                              {item.optic_disc_center
+                                ? `[${Array.isArray(item.optic_disc_center) ? item.optic_disc_center.join(', ') : item.optic_disc_center}]`
+                                : 'None detected'}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -363,6 +424,37 @@ export default function DoctorDashboard() {
                   <GradeBadge grade={item.drGrade} />
                   <span className="font-mono text-xs font-semibold text-[#20312A]">{item.confidence}</span>
                 </div>
+
+                {/* Lesions & Biomarkers in Mobile Card */}
+                <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-100 text-xs">
+                  <div className="flex items-center justify-between px-2 py-1 rounded bg-[#F8FAF7] border border-[#E2E7E3]">
+                    <span className="text-[11px] text-[#66756D]">Microaneurysms:</span>
+                    <span className={`font-semibold text-xs ${item.microaneurysm_count > 0 ? 'text-rose-700' : 'text-[#20312A]'}`}>
+                      {item.microaneurysm_count > 0 ? item.microaneurysm_count : '0 (none detected)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-2 py-1 rounded bg-[#F8FAF7] border border-[#E2E7E3]">
+                    <span className="text-[11px] text-[#66756D]">Hemorrhages:</span>
+                    <span className={`font-semibold text-xs ${item.hemorrhage_count > 0 ? 'text-red-700' : 'text-[#20312A]'}`}>
+                      {item.hemorrhage_count > 0 ? item.hemorrhage_count : '0 (none detected)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-2 py-1 rounded bg-[#F8FAF7] border border-[#E2E7E3]">
+                    <span className="text-[11px] text-[#66756D]">Exudate Area:</span>
+                    <span className={`font-semibold text-xs ${item.exudate_area_percent > 0 ? 'text-amber-800' : 'text-[#20312A]'}`}>
+                      {item.exudate_area_percent > 0 ? `${item.exudate_area_percent}%` : '0% (none detected)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-2 py-1 rounded bg-[#F8FAF7] border border-[#E2E7E3]">
+                    <span className="text-[11px] text-[#66756D]">Optic Disc:</span>
+                    <span className={`font-semibold text-xs truncate max-w-[90px] ${item.optic_disc_center ? 'text-teal-800' : 'text-[#20312A]'}`}>
+                      {item.optic_disc_center
+                        ? `[${Array.isArray(item.optic_disc_center) ? item.optic_disc_center.join(', ') : item.optic_disc_center}]`
+                        : 'None detected'}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
                   {item.urgency === 'Critical' || item.urgency === 'Urgent' ? (
                     <span className="text-[#DC2626] font-bold text-xs uppercase flex items-center gap-1"><AlertTriangle size={14} /><span>{item.urgency}</span></span>

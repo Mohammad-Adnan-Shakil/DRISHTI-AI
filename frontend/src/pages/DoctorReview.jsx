@@ -90,6 +90,10 @@ export default function DoctorReview() {
       : null,
     fundusUrl: apiAssetUrl(apiScreening?.fundus_image_url),
     heatmapUrl: apiAssetUrl(apiScreening?.heatmap_url),
+    microaneurysm_count: apiScreening?.microaneurysm_count ?? 0,
+    exudate_area_percent: apiScreening?.exudate_area_percent ?? 0.0,
+    hemorrhage_count: apiScreening?.hemorrhage_count ?? 0,
+    optic_disc_center: apiScreening?.optic_disc_center ?? null,
   }
   const urgencyLabel = getUrgencyLabel(displayReview.grade)
   const gradeLabel = GRADE_LABELS[displayReview.grade] ?? 'Unknown'
@@ -664,6 +668,41 @@ export default function DoctorReview() {
                   <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-rose-900">
                     <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
                     <span>{loadingReview ? '...' : urgencyLabel.toUpperCase()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detected Lesion Biomarkers */}
+              <div className="p-3.5 bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl space-y-2">
+                <div className="text-[10px] uppercase font-bold text-[#66756D] tracking-wider">
+                  Detected Lesion Biomarkers
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="p-2 bg-white rounded-lg border border-[#E2E7E3]">
+                    <span className="text-[10px] text-[#66756D] block">Microaneurysms</span>
+                    <span className={`font-bold font-mono text-sm ${displayReview.microaneurysm_count > 0 ? 'text-rose-700' : 'text-[#20312A]'}`}>
+                      {displayReview.microaneurysm_count > 0 ? displayReview.microaneurysm_count : '0 (none detected)'}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-white rounded-lg border border-[#E2E7E3]">
+                    <span className="text-[10px] text-[#66756D] block">Hemorrhages</span>
+                    <span className={`font-bold font-mono text-sm ${displayReview.hemorrhage_count > 0 ? 'text-red-700' : 'text-[#20312A]'}`}>
+                      {displayReview.hemorrhage_count > 0 ? displayReview.hemorrhage_count : '0 (none detected)'}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-white rounded-lg border border-[#E2E7E3]">
+                    <span className="text-[10px] text-[#66756D] block">Exudate Area</span>
+                    <span className={`font-bold font-mono text-sm ${displayReview.exudate_area_percent > 0 ? 'text-amber-800' : 'text-[#20312A]'}`}>
+                      {displayReview.exudate_area_percent > 0 ? `${displayReview.exudate_area_percent}%` : '0% (none detected)'}
+                    </span>
+                  </div>
+                  <div className="p-2 bg-white rounded-lg border border-[#E2E7E3]">
+                    <span className="text-[10px] text-[#66756D] block">Optic Disc</span>
+                    <span className={`font-bold font-mono text-xs truncate block ${displayReview.optic_disc_center ? 'text-teal-800' : 'text-[#20312A]'}`}>
+                      {displayReview.optic_disc_center
+                        ? `[${Array.isArray(displayReview.optic_disc_center) ? displayReview.optic_disc_center.join(', ') : displayReview.optic_disc_center}]`
+                        : 'None detected'}
+                    </span>
                   </div>
                 </div>
               </div>
