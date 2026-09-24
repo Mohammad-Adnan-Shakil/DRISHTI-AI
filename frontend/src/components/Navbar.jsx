@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LogOut, ChevronDown, Building2 } from 'lucide-react'
+import { LogOut, ChevronDown, Building2, Eye } from 'lucide-react'
 import OfflineBanner from './OfflineBanner'
 import { clearSession } from '../lib/auth'
 import { useTranslation } from 'react-i18next'
@@ -37,17 +37,12 @@ export default function Navbar({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3">
           <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="flex items-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-[#16866A] rounded-md p-1">
-              <div className="rounded-full p-2.5 bg-gradient-to-br from-[#E6F4EA] to-[#CCFBF1] flex items-center justify-center shadow-xs">
-                <img src="/drishti-logo.png" alt="DRISHTI" style={{ height: '32px', width: '32px' }} className="rounded-full object-cover" />
+            <Link to="/dashboard" className="flex items-center focus:outline-none focus:ring-2 focus:ring-[#16866A] rounded-md p-1">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
+                <Eye size={18} strokeWidth={2.5} />
               </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-xl tracking-tight text-[#20312A] leading-none">DRISHTI</span>
-                  <span className="bg-[#E6F4EA] text-[#047857] border-none px-2 py-0.5 rounded-md font-semibold text-xs leading-none">CLINICAL AI</span>
-                </div>
-                <span className="text-[11px] text-[#66756D] font-normal leading-tight hidden sm:inline">Better Vision. Better Tomorrow.</span>
-              </div>
+              <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A]">DRISHTI</span>
+              <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2">CLINICAL AI</span>
             </Link>
           </div>
 

@@ -1,4 +1,4 @@
-﻿# Environment files — NEVER commit these
+# Environment files — NEVER commit these
 .env
 *.env
 .env.*
@@ -15,6 +15,7 @@ __pycache__/
 backend/static/uploads/
 backend/static/temp/
 backend/static/heatmaps/
+backend/static/screenings/
 
 # Model weights
 ml/models/*.pth
@@ -38,8 +39,10 @@ ml/*.zip
 ml/data/
 data/
 
-drishti-keystore.jks
-.idea/
+# Databases
+*.db
+*.sqlite3
+backend/drishti.db
 
 drishti-keystore.jks
 .idea/

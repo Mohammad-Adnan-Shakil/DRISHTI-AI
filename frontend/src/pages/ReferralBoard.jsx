@@ -180,33 +180,35 @@ export default function ReferralBoard() {
 
           {!loading && !error && referrals?.length > 0 && (
             <>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-[#F8FAF7] border-b border-[#E2E7E3] text-[11px] uppercase tracking-wider text-[#66756D]">
-                    <tr>
-                      <th className="py-3.5 px-5">Referral</th>
-                      <th className="py-3.5 px-3">Patient</th>
-                      <th className="py-3.5 px-3">Directions</th>
-                      <th className="py-3.5 px-3">Screening</th>
-                      <th className="py-3.5 px-3">Date</th>
-                      <th className="py-3.5 px-3">Status</th>
-                      <th className="py-3.5 px-5 text-right">Update</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E2E7E3]">
-                    {referrals.map(referral => (
-                      <tr key={referral.referral_id}>
-                        <td className="py-4 px-5 font-mono text-xs text-[#20312A]">#{referral.referral_id}</td>
-                        <td className="py-4 px-3"><ReferralFields referral={referral} /></td>
-                        <td className="py-4 px-3"><DirectionsButton phcId={referral.phc_id} /></td>
-                        <td className="py-4 px-3 font-mono text-xs text-[#20312A]">#{referral.screening_id}</td>
-                        <td className="py-4 px-3 text-xs text-[#66756D]">N/A</td>
-                        <td className="py-4 px-3"><StatusBadge status={referral.status} /></td>
-                        <td className="py-4 px-5 text-right"><StatusSelect referral={referral} updatingId={updatingId} onChange={handleStatusChange} /></td>
+              <div className="hidden md:block">
+                <div className="w-full overflow-x-auto pb-4">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#F8FAF7] border-b border-[#E2E7E3] text-[11px] uppercase tracking-wider text-[#66756D]">
+                      <tr>
+                        <th className="py-3.5 px-5">Referral</th>
+                        <th className="py-3.5 px-3">Patient</th>
+                        <th className="py-3.5 px-3">Directions</th>
+                        <th className="py-3.5 px-3">Screening</th>
+                        <th className="py-3.5 px-3">Date</th>
+                        <th className="py-3.5 px-3">Status</th>
+                        <th className="py-3.5 px-5 text-right">Update</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[#E2E7E3]">
+                      {referrals.map(referral => (
+                        <tr key={referral.referral_id}>
+                          <td className="py-4 px-5 font-mono text-xs text-[#20312A]">#{referral.referral_id}</td>
+                          <td className="py-4 px-3"><ReferralFields referral={referral} /></td>
+                          <td className="py-4 px-3"><DirectionsButton phcId={referral.phc_id} /></td>
+                          <td className="py-4 px-3 font-mono text-xs text-[#20312A]">#{referral.screening_id}</td>
+                          <td className="py-4 px-3 text-xs text-[#66756D]">N/A</td>
+                          <td className="py-4 px-3"><StatusBadge status={referral.status} /></td>
+                          <td className="py-4 px-5 text-right"><StatusSelect referral={referral} updatingId={updatingId} onChange={handleStatusChange} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div className="md:hidden p-4 space-y-3">

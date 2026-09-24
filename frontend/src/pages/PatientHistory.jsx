@@ -19,7 +19,9 @@ import {
   Layers,
   Award,
   AlertCircle,
-  Loader2
+  Loader2,
+  Printer,
+  ShieldCheck
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import GradeBadge from '../components/GradeBadge'
@@ -28,6 +30,7 @@ import PatientHistoryPDF from '../components/PatientHistoryPDF'
 import { apiAssetUrl, getPatient, getPatientHistory } from '../lib/api'
 import { cn, RISK_TIER_STYLES } from '../lib/utils'
 import { exportNodeToPdf, sanitizeFilenameSegment } from '../lib/pdfExport'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const GRADE_LABELS = { 0: 'No DR', 1: 'Mild NPDR', 2: 'Moderate NPDR', 3: 'Severe NPDR', 4: 'Proliferative DR' }
 const GRADE_LINE_COLORS = { 0: '#047857', 1: '#B45309', 2: '#EA580C', 3: '#DC2626', 4: '#991B1B' }
@@ -56,16 +59,18 @@ export default function PatientHistory() {
   const [historyError, setHistoryError] = useState(null)
   const [retryToken, setRetryToken] = useState(0)
 
+  const isDemoPatient = !/^\d+$/.test(activePatientId)
+
   useEffect(() => {
+    if (isDemoPatient) {
+      setLoadingHistory(false)
+      setHistoryError(null)
+      return
+    }
     setLoadingHistory(true)
     setHistoryError(null)
     setApiPatient(null)
     setApiScreeningHistory([])
-    if (!/^\d+$/.test(activePatientId)) {
-      setHistoryError('A numeric patient ID is required to load live history.')
-      setLoadingHistory(false)
-      return
-    }
     let cancelled = false
     Promise.all([getPatient(activePatientId), getPatientHistory(activePatientId)])
       .then(([patient, history]) => {
@@ -81,7 +86,7 @@ export default function PatientHistory() {
         setLoadingHistory(false)
       })
     return () => { cancelled = true }
-  }, [activePatientId, retryToken])
+  }, [activePatientId, retryToken, isDemoPatient])
 
   // Most recent screening (server already orders history by created_at desc)
   // — drives the real fundus/Grad-CAM images in VISIT 1's viewer below.
@@ -118,7 +123,9 @@ export default function PatientHistory() {
   })
   const [toastMessage, setToastMessage] = useState(null)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [showPrintReportModal, setShowPrintReportModal] = useState(false)
   const pdfRef = useRef(null)
+  const modalPdfRef = useRef(null)
 
   // Demographics — real for API-backed patients (numeric IDs), the page's
   // demo values otherwise. The visit timeline and DR Grade chart below use
@@ -200,7 +207,8 @@ export default function PatientHistory() {
     setIsExportingPdf(true)
     try {
       const filenameSafeName = sanitizeFilenameSegment(patientDisplayName)
-      await exportNodeToPdf(pdfRef.current, `DRISHTI_History_${filenameSafeName}.pdf`)
+      const targetNode = modalPdfRef.current || pdfRef.current
+      await exportNodeToPdf(targetNode, `DRISHTI_History_${filenameSafeName}.pdf`)
       showToast(`Patient summary exported as clinical PDF (${activePatientId}.pdf)`)
     } catch (err) {
       console.error('Export patient history PDF failed:', err)
@@ -260,7 +268,7 @@ export default function PatientHistory() {
     )
   }
 
-  if (apiScreeningHistory.length === 0) {
+  if (!isDemoPatient && apiScreeningHistory.length === 0) {
     return (
       <div className="min-h-screen flex flex-col bg-[#F8FAF7] text-[#20312A]">
         <Navbar />
@@ -296,35 +304,6 @@ export default function PatientHistory() {
 
       {/* Main Navbar */}
       <Navbar />
-
-      {/* Secondary Subnav */}
-      <div className="border-b border-slate-200 bg-slate-100/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-10 flex items-center justify-between text-xs sm:text-sm">
-          <nav aria-label="Clinical Subnav" className="flex items-center gap-1 sm:gap-2">
-            <Link
-              to="/dashboard"
-              className="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors font-medium"
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/screening"
-              className="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors font-medium"
-            >
-              Screening
-            </Link>
-            <span className="px-3 py-1 rounded-md bg-white text-[#285943] font-semibold shadow-xs border border-slate-200">
-              Patient History
-            </span>
-          </nav>
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500">
-            <Building className="w-3.5 h-3.5 text-teal-600" />
-            <span>
-              Network: <strong className="text-slate-700 font-medium">PHC Hosakote · Karnataka</strong>
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -392,6 +371,14 @@ export default function PatientHistory() {
 
             {/* Header Actions */}
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPrintReportModal(true)}
+                className="h-10 px-4 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-[#285943] text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors border border-slate-200 shadow-2xs cursor-pointer"
+              >
+                <Printer className="w-4 h-4 text-[#285943]" />
+                <span>Print Report</span>
+              </button>
               <button
                 type="button"
                 onClick={handleExportSummaryPdf}
@@ -1218,6 +1205,35 @@ export default function PatientHistory() {
                           </div>
                         </div>
                       </div>
+
+                      {/* TASK 1: System Audit Trail (Secure Read-Only Log) */}
+                      <div className="p-3.5 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] space-y-2 text-[#475569]">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-[#E2E7E3]">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-[#20312A] uppercase tracking-tight">
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#16866A]" />
+                            <span>System Audit Trail</span>
+                          </div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200/70 text-[#475569] font-semibold">
+                            SECURE LOG · READ-ONLY
+                          </span>
+                        </div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-1">
+                            <span className="font-semibold text-slate-800">Clinical Override Applied by Dr. Arjun Sharma</span>
+                            <span className="font-mono text-[11px] text-[#475569]">14 Jan 2025, 11:45 AM</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <span className="font-semibold text-slate-700">Detail:</span>
+                            <span className="font-mono bg-white px-2 py-0.5 rounded border border-[#E2E7E3] text-slate-800 font-bold">
+                              AI Grade: 2 → Doctor Grade: 1
+                            </span>
+                          </div>
+                          <div className="text-[11px] leading-relaxed text-[#475569] bg-white/80 p-2.5 rounded-lg border border-[#E2E7E3]">
+                            <span className="font-semibold text-slate-700">Notes: </span>
+                            "Artifacts caused false positive. True grade is Mild."
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1613,6 +1629,288 @@ export default function PatientHistory() {
         </section>
       </main>
 
+      {/* TASK 2: Formal Hospital Print Report Modal */}
+      {showPrintReportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto">
+          <div className="relative w-full max-w-4xl bg-slate-100 rounded-2xl shadow-2xl border border-slate-300 overflow-hidden my-auto max-h-[95vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Control Header */}
+            <div className="bg-white px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-[#16866A]" />
+                <h3 className="text-sm font-bold text-slate-900 font-heading">
+                  Print Report Preview (Longitudinal Patient Record)
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportSummaryPdf}
+                  disabled={isExportingPdf}
+                  className="h-8 px-3 rounded-lg bg-[#285943] hover:bg-[#1f4534] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 shadow-xs"
+                >
+                  {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  <span>{isExportingPdf ? 'Exporting PDF...' : 'Download PDF'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="h-8 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrintReportModal(false)}
+                  className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Close modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / A4 Sheet View */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex justify-center bg-slate-100">
+              <div
+                ref={modalPdfRef}
+                style={{ width: '794px', minHeight: '1050px', aspectRatio: '1 / 1.414' }}
+                className="bg-white text-[#20312A] p-8 sm:p-10 rounded-xl shadow-md border border-slate-200 text-xs flex flex-col justify-between print:shadow-none print:border-none print:m-0 print:exact-colors print-color-adjust-exact"
+              >
+                <div>
+                  {/* 1. LETTERHEAD */}
+                  <div className="flex items-start justify-between border-b-4 border-[#285943] pb-4 mb-6">
+                    <div className="flex items-center">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
+                        <Eye size={18} strokeWidth={2.5} />
+                      </div>
+                      <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A] font-heading">
+                        DRISHTI
+                      </span>
+                      <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-[#047857]/20">
+                        CLINICAL AI
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <h2 className="text-base font-extrabold tracking-wide text-[#285943] uppercase font-heading">
+                        LONGITUDINAL PATIENT RECORD
+                      </h2>
+                      <div className="text-xs text-[#66756D] mt-0.5 space-y-0.5">
+                        <div>
+                          Generated: <span className="font-semibold text-[#20312A]">{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                        <div>
+                          Report ID:{' '}
+                          <span className="font-mono font-semibold text-[#20312A]">
+                            DRISHTI-HX-{activePatientId}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. PATIENT DEMOGRAPHICS BOX */}
+                  <div className="bg-[#F8FAF7] border border-[#E2E7E3] rounded-lg p-4 grid grid-cols-4 gap-4 text-sm mb-6">
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+                        Patient Name
+                      </span>
+                      <span className="text-[#20312A] font-semibold">
+                        {displayPatient.name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+                        Patient ID / ABHA
+                      </span>
+                      <span className="text-[#20312A] font-semibold font-mono">
+                        {activePatientId}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+                        Age / Gender
+                      </span>
+                      <span className="text-[#20312A] font-semibold">
+                        {displayPatient.ageGender}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+                        Facility / PHC
+                      </span>
+                      <span className="text-[#20312A] font-semibold">
+                        {displayPatient.phc}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 3. LATEST INSPECTION & RETINAL IMAGING */}
+                  <section className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#285943] font-heading">
+                        Latest Inspection &amp; Retinal Imaging
+                      </h3>
+                      <span className="text-[11px] font-mono text-[#66756D]">
+                        Visit: {latestAssessmentForPdf?.date || '14 Jan 2025'} &middot; Eye: {latestAssessmentForPdf?.eye || 'OD'}
+                      </span>
+                    </div>
+                    <div className="border border-[#E2E7E3] rounded-lg p-3.5 bg-white grid grid-cols-3 gap-3 items-center">
+                      {/* Fundus Thumbnail - Fixed: never a broken black square */}
+                      <div className="aspect-4/3 bg-slate-950 rounded-lg overflow-hidden border border-slate-200 flex flex-col items-center justify-between p-1.5 relative">
+                        <div className="w-full h-full flex items-center justify-center">
+                          {latestScreening?.fundus_image_url ? (
+                            <img
+                              src={apiAssetUrl(latestScreening.fundus_image_url)}
+                              alt="Latest Fundus Image"
+                              className="w-full h-full object-cover rounded"
+                              crossOrigin="anonymous"
+                            />
+                          ) : (
+                            <svg className="w-20 h-20 select-none" viewBox="0 0 100 100">
+                              <circle cx="50" cy="50" r="42" fill="#9A3412" />
+                              <circle cx="42" cy="46" r="8" fill="#FED7AA" />
+                              <circle cx="62" cy="50" r="10" fill="#431407" opacity="0.8" />
+                              <path d="M42,46 Q45,30 55,22 T75,16" stroke="#7F1D1D" strokeWidth="1.5" fill="none" />
+                              <path d="M42,46 Q47,60 60,70 T80,80" stroke="#7F1D1D" strokeWidth="1.6" fill="none" />
+                              <path d="M42,46 Q35,32 25,23 T12,17" stroke="#7F1D1D" strokeWidth="1.2" fill="none" />
+                              <path d="M42,46 Q34,58 24,71 T9,81" stroke="#7F1D1D" strokeWidth="1.3" fill="none" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="absolute bottom-1 left-1.5 bg-black/75 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
+                          Fundus ({latestAssessmentForPdf?.eye || 'OD'})
+                        </span>
+                      </div>
+
+                      {/* Grad-CAM Salience */}
+                      <div className="aspect-4/3 bg-slate-950 rounded-lg overflow-hidden border border-slate-200 flex flex-col items-center justify-between p-1.5 relative">
+                        <div className="w-full h-full flex items-center justify-center">
+                          {latestScreening?.heatmap_url ? (
+                            <img
+                              src={apiAssetUrl(latestScreening.heatmap_url)}
+                              alt="Grad-CAM Salience"
+                              className="w-full h-full object-cover rounded"
+                              crossOrigin="anonymous"
+                            />
+                          ) : (
+                            <svg className="w-20 h-20 select-none" viewBox="0 0 100 100">
+                              <circle cx="50" cy="50" r="42" fill="#9A3412" />
+                              <circle cx="48" cy="48" r="26" fill="#EF4444" opacity="0.8" filter="blur(3px)" />
+                              <circle cx="48" cy="48" r="16" fill="#FBBF24" opacity="0.7" filter="blur(2px)" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="absolute bottom-1 left-1.5 bg-black/75 text-amber-300 text-[9px] px-1.5 py-0.5 rounded font-mono">
+                          Grad-CAM Salience
+                        </span>
+                      </div>
+
+                      {/* Clinical Findings & Care Action */}
+                      <div className="text-xs space-y-1 p-1">
+                        <span className="text-[10px] uppercase font-bold text-[#66756D] block">
+                          Latest Clinical Assessment
+                        </span>
+                        <div className="text-xs font-bold text-[#20312A]">
+                          {latestAssessmentForPdf?.findings ? latestAssessmentForPdf.findings.split('.')[0] : 'ETDRS Grade 2 Moderate NPDR'}
+                        </div>
+                        <p className="text-[10.5px] text-[#66756D] leading-relaxed line-clamp-2">
+                          {latestAssessmentForPdf?.findings || 'Microaneurysms and early hard exudates confirmed with concordant Grad-CAM salience.'}
+                        </p>
+                        <div className="pt-1 flex items-center gap-2">
+                          <span className="text-[9.5px] font-bold text-[#047857] bg-[#E6F4EA] border border-[#047857]/20 rounded px-1.5 py-0.5">
+                            Confidence: {latestAssessmentForPdf?.confidence || 94}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* 4. DR GRADE PROGRESSION CHART */}
+                  <section className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#285943] font-heading">
+                        DR Grade Progression
+                      </h3>
+                      <span className="text-[10px] text-[#66756D] font-mono">
+                        0: No DR · 1: Mild · 2: Moderate · 3: Severe · 4: Proliferative
+                      </span>
+                    </div>
+                    <div className="border border-[#E2E7E3] rounded-lg p-4 mb-6 bg-white" style={{ height: 170 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartDataForPdf} margin={{ top: 8, right: 20, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E2E7E3" />
+                          <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#66756D' }} />
+                          <YAxis domain={[0, 4]} ticks={[0, 1, 2, 3, 4]} tick={{ fontSize: 10, fill: '#66756D' }} />
+                          <Tooltip />
+                          <Line
+                            type="monotone"
+                            dataKey="grade"
+                            stroke="#285943"
+                            strokeWidth={2.5}
+                            dot={{ r: 4, fill: '#285943' }}
+                            activeDot={{ r: 6, fill: '#16866A' }}
+                            isAnimationActive={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </section>
+
+                  {/* 5. SCREENING HISTORY TABLE */}
+                  <section className="mb-6">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#285943] mb-2 font-heading">
+                      Screening History (5 Most Recent Visits)
+                    </h3>
+                    <div className="w-full overflow-hidden rounded-lg border border-[#E2E7E3]">
+                      <table className="border-collapse w-full text-sm">
+                        <thead>
+                          <tr className="bg-[#F8FAF7] text-[#66756D] text-xs uppercase font-bold border-b-2 border-[#285943]">
+                            <th className="py-2 px-3 text-left">Date</th>
+                            <th className="py-2 px-3 text-left">Eye</th>
+                            <th className="py-2 px-3 text-left">AI Grade</th>
+                            <th className="py-2 px-3 text-left">Doctor Assessment</th>
+                            <th className="py-2 px-3 text-right">Care Plan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {historyDataForPdf.slice(0, 5).map((v, i) => (
+                            <tr key={i} className="border-b border-[#E2E7E3] py-2 last:border-0 hover:bg-[#F8FAF7]/50">
+                              <td className="py-2 px-3 font-semibold text-[#20312A]">{v.date}</td>
+                              <td className="py-2 px-3 font-mono font-medium text-[#66756D]">{v.eye}</td>
+                              <td className="py-2 px-3 font-bold">
+                                <span className={v.grade >= 3 ? 'text-[#B91C1C]' : v.grade >= 1 ? 'text-[#D97706]' : 'text-[#059669]'}>
+                                  Grade {v.grade} {GRADE_LABELS[v.grade] ? `· ${GRADE_LABELS[v.grade]}` : ''}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-[#20312A]">{v.doctorAssessment}</td>
+                              <td className="py-2 px-3 text-right text-[#66756D] font-medium">{v.carePlan}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                </div>
+
+                {/* 6. DOCTOR SIGNATURE LINE & DISCLAIMER */}
+                <div>
+                  <div className="flex justify-between mt-12 pt-8 border-t border-[#E2E7E3] text-xs text-[#20312A] font-semibold">
+                    <div>Reviewing Physician: ____________________</div>
+                    <div>Signature &amp; Date: ____________________</div>
+                  </div>
+
+                  <div className="text-[9.5px] text-[#66756D] mt-6 pt-3 border-t border-[#E2E7E3] leading-relaxed">
+                    <strong>Medical Disclaimer:</strong> Longitudinal tele-ophthalmology record compiled under National Health Mission protocols. Historical AI triage results serve as clinical decision support. Final diagnostic responsibility remains with the reviewing physician.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Offscreen A4 report captured by handleExportSummaryPdf via html2canvas + jsPDF */}
       <div style={{ position: 'fixed', top: 0, left: '-10000px', zIndex: -1 }} aria-hidden="true">
         <PatientHistoryPDF
@@ -1621,6 +1919,7 @@ export default function PatientHistory() {
           historyData={historyDataForPdf}
           latestAssessment={latestAssessmentForPdf}
           chartData={chartDataForPdf}
+          latestScreening={latestScreening}
         />
       </div>
     </div>

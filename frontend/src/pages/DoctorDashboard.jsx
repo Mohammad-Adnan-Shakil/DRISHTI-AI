@@ -271,8 +271,9 @@ export default function DoctorDashboard() {
           </div>
 
           {/* Desktop Table */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="hidden sm:block">
+            <div className="w-full overflow-x-auto pb-4">
+              <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-[#E2E7E3] bg-[#F8FAF7] text-[11px] font-semibold text-[#66756D] uppercase tracking-wider">
                   <th scope="col" className="py-3.5 pl-5 pr-3">Patient</th>
@@ -334,6 +335,7 @@ export default function DoctorDashboard() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Mobile Cards */}

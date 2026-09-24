@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+          <!-- Header with logo -->
+          <tr>
+            <td style="background-color:#0f766e; background:linear-gradient(90deg,#0f766e,#0891b2); padding:24px 32px;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding-right:12px; vertical-align:middle;">
+                    <img src="cid:drishti-logo" alt="DRISHTI-AI" width="44" height="44" style="display:block; border:0; border-radius:8px; background:#ffffff;">
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <h1 style="color:#ffffff; margin:0; font-size:22px;">DRISHTI-AI</h1>
+                    <p style="color:#d1fae5; margin:4px 0 0; font-size:13px;">AI-Assisted Diabetic Retinopathy Screening</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding:28px 32px 0;">
+              <p style="font-size:16px; color:#111827; margin:0;">Dear <strong>{{ patientName }}</strong>,</p>
+              <p style="font-size:14px; color:#4b5563; line-height:1.6;">
+                Thank you for completing your eye screening at <strong>{{ phcName }}</strong> on <strong>{{ screeningDate }}</strong>. Here is a summary of your results.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Result Card (color changes with grade) -->
+          <tr>
+            <td style="padding:8px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:{{ gradeBg }}; border-left:5px solid {{ gradeBorder }}; border-radius:6px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0; font-size:13px; color:{{ gradeLabel }}; font-weight:bold; letter-spacing:0.5px;">SCREENING RESULT</p>
+                    <p style="margin:6px 0 0; font-size:16px; color:{{ gradeText }}; font-weight:600;">{{ drGradeText }}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Recommendation Card -->
+          <tr>
+            <td style="padding:8px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#dbeafe; border-left:5px solid #2563eb; border-radius:6px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0; font-size:13px; color:#1e3a8a; font-weight:bold; letter-spacing:0.5px;">RECOMMENDED ACTION</p>
+                    <p style="margin:6px 0 0; font-size:14px; color:#1e40af; line-height:1.5;">{{ recommendedAction }}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- PHC Contact -->
+          <tr>
+            <td style="padding:20px 32px 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4; border-radius:6px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0; font-size:13px; color:#166534; font-weight:bold;">NEED HELP?</p>
+                    <p style="margin:6px 0 0; font-size:14px; color:#166534;">
+                      Contact <strong>{{ phcName }}</strong> at <strong>{{ phcContact }}</strong>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Disclaimer -->
+          <tr>
+            <td style="padding:24px 32px 8px;">
+              <p style="font-size:11px; color:#9ca3af; line-height:1.5; border-top:1px solid #e5e7eb; padding-top:12px;">
+                This is an AI-assisted screening result and does not replace professional diagnosis. Final assessment and treatment decisions remain the responsibility of a qualified examining physician.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#111827; padding:16px 32px; text-align:center;">
+              <p style="margin:0; font-size:12px; color:#9ca3af;">DRISHTI-AI · Smart India Hackathon 2026 · Team NullPointer</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

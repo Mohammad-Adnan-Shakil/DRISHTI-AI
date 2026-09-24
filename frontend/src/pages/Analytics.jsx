@@ -12,7 +12,6 @@ import { exportAnalyticsToCSV } from '../lib/csvExport'
 export default function Analytics() {
   const [dateRange, setDateRange] = useState('30')
   const [showExportToast, setShowExportToast] = useState(false)
-  const [activeSection, setActiveSection] = useState('overview')
   const [stats, setStats] = useState(null)
   const [refStats, setRefStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -77,12 +76,6 @@ export default function Analytics() {
     return [...segments, { ...item, offset }]
   }, [])
 
-  const sectionAnchors = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'operations', label: 'Operations' },
-    { id: 'phc-performance', label: 'PHC Performance' }
-  ]
-
   const handleExportAnalyticsCsv = () => {
     if (!stats) return
     const kpiData = {
@@ -115,18 +108,6 @@ export default function Analytics() {
           <span>Exporting System Analytics CSV... Download ready.</span>
         </div>
       )}
-
-      {/* Sticky Subnav */}
-      <div className="sticky top-[56px] z-30 bg-white/95 backdrop-blur-md border-b border-[#E2E7E3] shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-1 h-10 overflow-x-auto">
-          {sectionAnchors.map(({ id, label }) => (
-            <button key={id} type="button" onClick={() => { setActiveSection(id); document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
-              className={`px-3.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${activeSection === id ? 'bg-gradient-to-r from-[#D9F99D] via-[#DCFCE7] to-[#CCFBF1] text-[#14532D] border border-[#A7F3D0] shadow-2xs' : 'text-[#66756D] hover:text-[#20312A] hover:bg-slate-100'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
 
@@ -356,7 +337,7 @@ export default function Analytics() {
               </div>
               <span className="text-[11px] font-semibold text-[#66756D] bg-[#F8FAF7] px-2.5 py-1 rounded border border-[#E2E7E3]">PHC breakdown unavailable</span>
             </div>
-            <div className="overflow-x-auto">
+            <div className="w-full overflow-x-auto pb-4">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-[#F8FAF7] text-[#66756D] text-[11px] font-semibold uppercase tracking-wider border-b border-[#E2E7E3]">

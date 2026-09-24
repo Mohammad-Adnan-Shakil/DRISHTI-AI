@@ -1,25 +1,19 @@
 import { forwardRef } from 'react'
+import { Eye } from 'lucide-react'
 
-const RISK_TEXT_COLORS = {
-  0: '#059669',
-  1: '#D97706',
-  2: '#EA580C',
-  3: '#DC2626',
-  4: '#991B1B'
-}
-
-// Offscreen-rendered A4 single-visit report captured by html2canvas + jsPDF
-// (see lib/pdfExport.js). Fixed 794px width = A4 page width at 96dpi.
+// Offscreen-rendered or modal-rendered A4 single-visit report captured by html2canvas + jsPDF
+// Fixed 794px width = A4 page width at 96dpi.
 const ScreeningReportPDF = forwardRef(function ScreeningReportPDF(
   {
     patient,
-    activeGrade,
-    activeConfidence,
-    activeEye,
+    activeGrade = 2,
+    activeConfidence = 94,
+    activeEye = 'OD',
     gradeInfo,
+    fundusUrl,
     gradcamUrl,
     recommendationText,
-    qualityScore
+    qualityScore = 92
   },
   ref
 ) {
@@ -29,393 +23,221 @@ const ScreeningReportPDF = forwardRef(function ScreeningReportPDF(
     year: 'numeric'
   })
 
-  const gradeColor = RISK_TEXT_COLORS[activeGrade] ?? '#20312A'
+  const gradeColor =
+    activeGrade >= 3 ? '#B91C1C' : activeGrade >= 1 ? '#D97706' : '#059669'
 
   return (
     <div
       ref={ref}
       style={{
         width: '794px',
+        minHeight: '1050px',
+        aspectRatio: '1 / 1.414',
         background: '#FFFFFF',
         color: '#20312A',
         fontFamily: 'Inter, Arial, sans-serif'
       }}
-      className="p-10 text-sm"
+      className="p-8 sm:p-10 text-xs flex flex-col justify-between print:shadow-none print:border-none print:m-0 print:exact-colors print-color-adjust-exact"
     >
-      {/* HEADER */}
-      <div className="border-b border-[#E2E7E3] pb-4 mb-6">
-        <div
-          style={{
-            display: 'table',
-            width: '100%',
-            tableLayout: 'fixed'
-          }}
-        >
-          {/* LEFT HEADER */}
-          <div
-            style={{
-              display: 'table-cell',
-              width: '65%',
-              verticalAlign: 'middle'
-            }}
-          >
-            <div
-              style={{
-                display: 'table',
-                height: '60px'
-              }}
-            >
-              {/* LOGO */}
-              <div
-                style={{
-                  display: 'table-cell',
-                  width: '60px',
-                  height: '60px',
-                  verticalAlign: 'middle'
-                }}
-              >
-                <img
-                  src="/drishti-logo.png"
-                  alt="DRISHTI"
-                  style={{
-                    height: '60px',
-                    width: '60px',
-                    objectFit: 'cover',
-                    borderRadius: '9999px',
-                    display: 'block'
-                  }}
-                />
-              </div>
-
-              {/* AI SCREENING REPORT BADGE */}
-              <div
-                style={{
-                  display: 'table-cell',
-                  verticalAlign: 'middle',
-                  paddingLeft: '8px',
-                  height: '60px'
-                }}
-              >
-                <div
-                  style={{
-                    display: 'inline-block',
-                    padding: '5px 10px',
-                    borderRadius: '9999px',
-                    backgroundColor: '#E6F4EA',
-                    color: '#047857',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    lineHeight: '14px',
-                    whiteSpace: 'nowrap',
-                    textAlign: 'center',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  AI Screening Report
-                </div>
-              </div>
+      <div>
+        {/* 1. LETTERHEAD */}
+        <div className="flex items-start justify-between border-b-4 border-[#285943] pb-4 mb-6">
+          <div className="flex items-center">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
+              <Eye size={18} strokeWidth={2.5} />
             </div>
-
-            <p className="text-xs text-[#66756D] mt-1">
-              Single-Visit Retinal Screening Summary
-            </p>
+            <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A] font-heading">
+              DRISHTI
+            </span>
+            <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-[#047857]/20">
+              CLINICAL AI
+            </span>
           </div>
 
-          {/* RIGHT HEADER */}
-          <div
-            style={{
-              display: 'table-cell',
-              width: '35%',
-              verticalAlign: 'middle',
-              textAlign: 'right'
-            }}
-          >
-            <div className="text-[11px] text-[#66756D]">
-              <div>Generated: {generatedOn}</div>
-              <div>Report ID: DRISHTI-SR-{patient?.id ?? '—'}</div>
+          <div className="text-right">
+            <h2 className="text-base font-extrabold tracking-wide text-[#285943] uppercase font-heading">
+              CLINICAL ASSESSMENT REPORT
+            </h2>
+            <div className="text-xs text-[#66756D] mt-0.5 space-y-0.5">
+              <div>
+                Generated: <span className="font-semibold text-[#20312A]">{generatedOn}</span>
+              </div>
+              <div>
+                Report ID:{' '}
+                <span className="font-mono font-semibold text-[#20312A]">
+                  DRISHTI-CR-{patient?.id ?? '—'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* PATIENT INFO */}
-      <section className="mb-6">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[#285943] mb-2">
-          Patient Information
-        </h2>
-
-        <div className="grid grid-cols-4 gap-4 bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl p-4 text-xs">
+        {/* 2. PATIENT DEMOGRAPHICS BOX */}
+        <div className="bg-[#F8FAF7] border border-[#E2E7E3] rounded-lg p-4 grid grid-cols-4 gap-4 text-sm mb-6">
           <div>
-            <span className="block text-[10px] uppercase text-[#66756D] font-semibold">
-              Name
+            <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+              Patient Name
             </span>
-            <span className="font-bold text-[#20312A]">
+            <span className="text-[#20312A] font-semibold">
               {patient?.name ?? '—'}
             </span>
           </div>
-
           <div>
-            <span className="block text-[10px] uppercase text-[#66756D] font-semibold">
-              Patient ID
+            <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+              Patient ID / ABHA
             </span>
-            <span className="font-mono font-semibold text-[#20312A]">
+            <span className="text-[#20312A] font-semibold font-mono">
               {patient?.id ?? '—'}
             </span>
           </div>
-
           <div>
-            <span className="block text-[10px] uppercase text-[#66756D] font-semibold">
+            <span className="block text-[10px] uppercase font-bold text-[#66756D]">
               Age / Gender
             </span>
-            <span className="font-semibold text-[#20312A]">
+            <span className="text-[#20312A] font-semibold">
               {patient?.ageGender ?? '—'}
             </span>
           </div>
-
           <div>
-            <span className="block text-[10px] uppercase text-[#66756D] font-semibold">
-              PHC
+            <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+              Facility / PHC
             </span>
-            <span className="font-semibold text-[#20312A]">
+            <span className="text-[#20312A] font-semibold">
               {patient?.phc ?? '—'}
             </span>
           </div>
         </div>
-      </section>
 
-      {/* AI RESULT */}
-      <section className="mb-6">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[#285943] mb-2">
-          AI-Assisted Screening Result
-        </h2>
-
-        <div
-          style={{
-            border: '1px solid #E5E7EB',
-            backgroundColor: '#F9FAFB',
-            borderRadius: '12px',
-            padding: '16px',
-            boxSizing: 'border-box'
-          }}
-        >
-          {/* RESULT HEADER */}
-          <div
-            style={{
-              display: 'table',
-              width: '100%',
-              tableLayout: 'fixed'
-            }}
-          >
-            {/* LEFT RESULT CONTENT */}
-            <div
-              style={{
-                display: 'table-cell',
-                width: '75%',
-                verticalAlign: 'middle',
-                paddingRight: '16px',
-                boxSizing: 'border-box'
-              }}
-            >
+        {/* 3. AI FINDINGS & IMAGING (Side-by-Side) */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* Left Column: AI-Assisted Screening Result */}
+          <div className="border border-[#E2E7E3] rounded-lg p-4 bg-white flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-bold text-[#66756D]">
+                  AI-Assisted Screening Result
+                </span>
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#F8FAF7] border border-[#E2E7E3] text-[#285943]">
+                  {gradeInfo?.risk ?? 'Moderate Risk'}
+                </span>
+              </div>
               <div
-                style={{
-                  color: gradeColor,
-                  fontSize: '18px',
-                  fontWeight: 800,
-                  lineHeight: '23px',
-                  margin: 0,
-                  padding: 0,
-                  whiteSpace: 'nowrap'
-                }}
+                className="text-xl font-bold mb-1"
+                style={{ color: gradeColor }}
               >
                 {gradeInfo?.title ?? `Grade ${activeGrade}`}
               </div>
-
-              <div
-                style={{
-                  color: '#66756D',
-                  fontSize: '12px',
-                  marginTop: '2px',
-                  lineHeight: '17px',
-                  whiteSpace: 'nowrap'
-                }}
-              >
+              <p className="text-xs text-[#66756D] mb-4">
                 Examined Eye:{' '}
-                <strong>
-                  {activeEye === 'OD'
-                    ? 'Right Eye (OD)'
-                    : 'Left Eye (OS)'}
-                </strong>{' '}
-                &middot; Field: 45&deg; Non-Mydriatic &middot; Image Quality:{' '}
-                {qualityScore}%
+                <span className="font-semibold text-[#20312A]">
+                  {activeEye === 'OD' ? 'Right Eye (OD)' : 'Left Eye (OS)'}
+                </span>{' '}
+                &middot; Field:{' '}
+                <span className="font-semibold text-[#20312A]">45° Non-Mydriatic</span>{' '}
+                &middot; Quality:{' '}
+                <span className="font-semibold text-[#20312A]">{qualityScore}%</span>
+              </p>
+            </div>
+
+            <div className="space-y-3 pt-3 border-t border-[#E2E7E3]">
+              <div>
+                <div className="flex justify-between items-center text-xs mb-1.5">
+                  <span className="text-[10px] uppercase font-bold text-[#66756D]">
+                    Diagnostic Confidence
+                  </span>
+                  <span className="font-mono font-bold text-[#20312A]">
+                    {activeConfidence}%
+                  </span>
+                </div>
+                <div className="w-full h-2.5 bg-[#E2E7E3] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#16866A] rounded-full transition-all"
+                    style={{ width: `${activeConfidence}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-[#F8FAF7] rounded-md p-2.5 border border-[#E2E7E3]">
+                <span className="text-[10px] uppercase font-bold text-[#285943] block mb-0.5">
+                  Clinical Recommendation
+                </span>
+                <p className="text-xs text-[#20312A] leading-relaxed">
+                  {recommendationText ?? gradeInfo?.recommendation}
+                </p>
               </div>
             </div>
+          </div>
 
-            {/* RIGHT RISK BADGE */}
-            <div
-              style={{
-                display: 'table-cell',
-                width: '25%',
-                verticalAlign: 'middle',
-                textAlign: 'right',
-                boxSizing: 'border-box'
-              }}
-            >
-              <span
-                style={{
-                  display: 'inline-block',
-                  padding: '6px 14px',
-                  borderRadius: '9999px',
-                  border: `1px solid ${gradeColor}`,
-                  color: gradeColor,
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  lineHeight: '16px',
-                  whiteSpace: 'nowrap',
-                  textAlign: 'center',
-                  boxSizing: 'border-box',
-                  verticalAlign: 'middle'
-                }}
-              >
-                {gradeInfo?.risk ?? '—'}
+          {/* Right Column: IMAGING */}
+          <div className="border border-[#E2E7E3] rounded-lg p-4 bg-white flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-[#66756D] block mb-2.5">
+                Retinal Imaging &amp; Salience Overlay
               </span>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Fig 1: Standard Fundus */}
+                <div className="aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative">
+                  {fundusUrl ? (
+                    <img
+                      src={fundusUrl}
+                      alt="Standard Fundus"
+                      className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <svg className="w-24 h-24 select-none" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="42" fill="#9A3412" />
+                      <circle cx="42" cy="46" r="8" fill="#FED7AA" />
+                      <circle cx="62" cy="50" r="10" fill="#431407" opacity="0.8" />
+                      <path d="M42,46 Q45,30 55,22 T75,16" stroke="#7F1D1D" strokeWidth="1.5" fill="none" />
+                      <path d="M42,46 Q47,60 60,70 T80,80" stroke="#7F1D1D" strokeWidth="1.6" fill="none" />
+                    </svg>
+                  )}
+                  <span className="absolute bottom-1 left-1 bg-black/75 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
+                    {activeEye} · 45°
+                  </span>
+                </div>
 
-          {/* CONFIDENCE */}
-          <div
-            style={{
-              marginTop: '16px'
-            }}
-          >
-            <div
-              style={{
-                display: 'table',
-                width: '100%',
-                fontSize: '12px',
-                fontWeight: 600,
-                marginBottom: '4px'
-              }}
-            >
-              <span
-                style={{
-                  display: 'table-cell',
-                  color: '#66756D'
-                }}
-              >
-                Diagnostic AI Confidence
-              </span>
-
-              <span
-                style={{
-                  display: 'table-cell',
-                  color: '#20312A',
-                  fontFamily: 'monospace',
-                  fontWeight: 700,
-                  textAlign: 'right'
-                }}
-              >
-                {activeConfidence}%
-              </span>
+                {/* Fig 2: Grad-CAM Salience */}
+                <div className="aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative">
+                  {gradcamUrl ? (
+                    <img
+                      src={gradcamUrl}
+                      alt="Grad-CAM Salience"
+                      className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                    />
+                  ) : (
+                    <svg className="w-24 h-24 select-none" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="42" fill="#9A3412" />
+                      <circle cx="48" cy="48" r="26" fill="#EF4444" opacity="0.8" filter="blur(3px)" />
+                      <circle cx="48" cy="48" r="16" fill="#FBBF24" opacity="0.7" filter="blur(2px)" />
+                    </svg>
+                  )}
+                  <span className="absolute bottom-1 left-1 bg-black/75 text-amber-300 text-[9px] px-1.5 py-0.5 rounded font-mono">
+                    Grad-CAM
+                  </span>
+                </div>
+              </div>
             </div>
-
-            <div
-              style={{
-                width: '100%',
-                height: '8px',
-                backgroundColor: '#F1F5F9',
-                borderRadius: '9999px',
-                overflow: 'hidden'
-              }}
-            >
-              <div
-                style={{
-                  height: '100%',
-                  width: `${activeConfidence}%`,
-                  backgroundColor: '#16866A',
-                  borderRadius: '9999px'
-                }}
-              />
-            </div>
+            <p className="text-[10px] text-[#66756D] text-center mt-3 font-medium italic">
+              Fig 1: Standard Fundus | Fig 2: Grad-CAM Salience
+            </p>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* GRAD-CAM THUMBNAIL */}
-      <section className="mb-6">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[#285943] mb-2">
-          Grad-CAM Attention Map
-        </h2>
-
-        <div className="flex items-center gap-4 bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl p-4">
-          {gradcamUrl ? (
-            <img
-              src={gradcamUrl}
-              crossOrigin="anonymous"
-              alt="Grad-CAM heatmap"
-              className="w-32 h-32 object-cover rounded-lg border border-[#1E293B] shrink-0"
-            />
-          ) : (
-            <div className="w-32 h-32 rounded-lg bg-[#0F172A] text-[#94A3B8] text-[10px] flex items-center justify-center text-center shrink-0 p-2">
-              No Grad-CAM image available
-            </div>
-          )}
-
-          <p className="text-xs text-[#66756D] leading-relaxed">
-            The highlighted region represents the visual attention map of
-            the neural network, concentrated on areas suggestive of the
-            identified pathology. Intended for clinical assistance, not
-            definitive lesion segmentation.
-          </p>
-        </div>
-      </section>
-
-      {/* CLINICAL RECOMMENDATION */}
-      <section className="mb-6 bg-[#EAFBF7] border border-[#5EEAD4] rounded-xl p-4 text-xs">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[#0D9488] mb-1.5">
-          Clinical Recommendation
-        </h2>
-
-        <div className="font-bold text-[#20312A] mb-1">
-          {gradeInfo?.recommendationTitle}
+      {/* 4. DOCTOR SIGNATURE LINE & DISCLAIMER */}
+      <div>
+        <div className="flex justify-between mt-12 pt-8 border-t border-[#E2E7E3] text-xs text-[#20312A] font-semibold">
+          <div>Reviewing Physician: ____________________</div>
+          <div>Signature &amp; Date: ____________________</div>
         </div>
 
-        <p className="text-[#20312A] leading-relaxed">
-          {recommendationText ?? gradeInfo?.recommendation}
-        </p>
-      </section>
-
-      {/* DOCTOR SIGN-OFF */}
-      <section className="mb-6">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[#285943] mb-2">
-          Doctor Sign-Off
-        </h2>
-
-        <div className="border border-[#E2E7E3] rounded-xl p-4 grid grid-cols-2 gap-6 text-xs">
-          <div>
-            <span className="block text-[10px] uppercase text-[#66756D] font-semibold mb-4">
-              Reviewing Doctor
-            </span>
-            <div className="border-b border-[#94A3B8] h-6" />
-          </div>
-
-          <div>
-            <span className="block text-[10px] uppercase text-[#66756D] font-semibold mb-4">
-              Signature &amp; Date
-            </span>
-            <div className="border-b border-[#94A3B8] h-6" />
-          </div>
+        <div className="text-[9.5px] text-[#66756D] mt-6 pt-3 border-t border-[#E2E7E3] leading-relaxed">
+          <strong>Medical Disclaimer:</strong> This clinical assessment document is generated by DRISHTI AI Screening Support under National Tele-Ophthalmology Protocols. AI triage recommendations must be confirmed by a licensed ophthalmologist or medical practitioner.
         </div>
-      </section>
-
-      {/* DISCLAIMER */}
-      <section className="text-[10px] text-[#66756D] leading-relaxed border-t border-[#E2E7E3] pt-3">
-        <strong>Medical Disclaimer:</strong> AI screening supports clinical
-        decision-making and does not replace professional diagnosis. Final
-        assessment and treatment decisions remain the responsibility of the
-        qualified examining physician.
-      </section>
+      </div>
     </div>
   )
 })

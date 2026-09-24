@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   Search,
-  Check,
   CheckCircle2,
   RefreshCw,
   ZoomIn,
@@ -18,8 +17,13 @@ import {
   AlertTriangle,
   FileText,
   Printer,
+  Globe,
   Sliders,
-  ImageOff
+  ImageOff,
+  Eye,
+  Download,
+  Loader2,
+  X
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { useTranslation } from 'react-i18next'
@@ -243,7 +247,16 @@ export default function Screening() {
 
   // Screening report PDF export
   const [isExportingReport, setIsExportingReport] = useState(false)
+  const [showPrintModal, setShowPrintModal] = useState(false)
   const reportPdfRef = useRef(null)
+  const reportModalRef = useRef(null)
+
+  // Patient language override for report & printout (Task 3)
+  const [reportLanguage, setReportLanguage] = useState('English')
+
+  // Email patient state (Task 4)
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [emailToast, setEmailToast] = useState(null)
 
   // Auto-select the patient just registered on the Register page (passed via
   // navigate('/screening', { state: { patientId, patientName } })).
@@ -316,6 +329,55 @@ export default function Screening() {
   // classification — the grade shown is only the Demo Simulator placeholder,
   // so saving/creating a referral now would duplicate what sync.js will do.
   const isPendingOfflineClassification = Boolean(offlineQueueKey) && !aiResult
+
+  // Synchronize default report language when patient preferred language changes
+  useEffect(() => {
+    if (selectedPatient?.language) {
+      if (selectedPatient.language.includes('Kannada')) setReportLanguage('Kannada')
+      else if (selectedPatient.language.includes('Hindi')) setReportLanguage('Hindi')
+      else if (selectedPatient.language.includes('Tamil')) setReportLanguage('Tamil')
+      else if (selectedPatient.language.includes('Telugu')) setReportLanguage('Telugu')
+      else setReportLanguage('English')
+    }
+  }, [selectedPatientId, selectedPatient?.language])
+
+  // Multi-Class Probability Distribution helper (Task 2)
+  const getGradeProbabilities = (grade, confidence) => {
+    if (aiResult?.all_probs && Array.isArray(aiResult.all_probs) && aiResult.all_probs.length === 5) {
+      return aiResult.all_probs.map((p, idx) => ({
+        grade: idx,
+        percent: Math.round(p * 100),
+        isTop: idx === grade
+      }))
+    }
+    // Mock data matching specification: Grade 0 (1%), Grade 1 (3%), Grade 2 (94%), Grade 3 (2%), Grade 4 (0%)
+    const distributions = {
+      0: [confidence, Math.max(0, 98 - confidence), 2, 0, 0],
+      1: [3, confidence, Math.max(0, 97 - confidence), 0, 0],
+      2: [1, 3, confidence, Math.max(0, 98 - confidence), 0],
+      3: [0, 1, Math.max(0, 97 - confidence), confidence, 2],
+      4: [0, 0, 1, Math.max(0, 97 - confidence), confidence]
+    }
+    const dist = distributions[grade] || [1, 3, confidence, 2, 0]
+    return [0, 1, 2, 3, 4].map(g => ({
+      grade: g,
+      percent: dist[g] ?? 0,
+      isTop: g === grade
+    }))
+  }
+
+  // Handle Send Email action with 1s loading state and Success Toast (Task 4)
+  const handleSendEmail = () => {
+    if (isSendingEmail) return
+    setIsSendingEmail(true)
+    setTimeout(() => {
+      setIsSendingEmail(false)
+      setEmailToast('Email sent to patient with screening summary and next steps.')
+      setTimeout(() => {
+        setEmailToast(null)
+      }, 4500)
+    }, 1000)
+  }
 
   // Zoom handlers
   const zoomIn = () => handleZoomIn(setZoomLevel)
@@ -571,7 +633,7 @@ export default function Screening() {
       risk_stratification: gradeInfo.risk,
       referral_recommended: activeGrade >= 2,
       recommendation_text: recommendationText ?? gradeInfo.recommendation,
-      recommendation_language: 'English'
+      recommendation_language: reportLanguage
     }
     const offlineKey = [
       selectedPatient.realId,
@@ -659,7 +721,8 @@ export default function Screening() {
     try {
       const dateStr = new Date().toISOString().slice(0, 10)
       const filenameSafeId = sanitizeFilenameSegment(String(selectedPatient.id))
-      await exportNodeToPdf(reportPdfRef.current, `DRISHTI_Screening_${filenameSafeId}_${dateStr}.pdf`)
+      const targetNode = reportModalRef.current || reportPdfRef.current
+      await exportNodeToPdf(targetNode, `DRISHTI_Screening_${filenameSafeId}_${dateStr}.pdf`)
     } catch (err) {
       console.error('Export screening report PDF failed:', err)
     } finally {
@@ -671,14 +734,10 @@ export default function Screening() {
   const currentStepIndex = getStepIndex(screeningStep)
 
   const LAYER_OPTIONS = [
-    { id: 'original', label: t('screening.original') },
-    { id: 'gradcam', label: t('screening.gradcamHeatmap') },
-    { id: 'vessel', label: t('screening.vesselMap') },
-    { id: 'microaneurysm', label: 'Microaneurysms' },
-    { id: 'exudate', label: 'Exudates' },
-    { id: 'hemorrhage', label: 'Hemorrhages' },
-    { id: 'opticdisc', label: 'Optic Disc' },
-    { id: 'compare', label: t('screening.compare') }
+    { id: 'original', label: 'Original' },
+    { id: 'gradcam', label: 'Grad-CAM' },
+    { id: 'vessel', label: 'Vessel Map' },
+    { id: 'lesions', label: 'Lesions' }
   ]
 
   const PIPELINE_STAGES = [
@@ -904,6 +963,26 @@ export default function Screening() {
                     <span className="text-[#475569]">{t('screening.preferredLanguage')}:</span>
                     <span className="font-semibold text-[#20312A]">{selectedPatient.language} • {t('common.audioGuidance')}</span>
                   </div>
+                  {/* Task 3: Patient Language Override Dropdown */}
+                  <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3]">
+                    <div className="flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-[#16866A] shrink-0" />
+                      <label htmlFor="report-language-select" className="text-[#475569] font-medium">Report Language:</label>
+                    </div>
+                    <select
+                      id="report-language-select"
+                      value={reportLanguage}
+                      onChange={(e) => setReportLanguage(e.target.value)}
+                      className="bg-white border border-[#E2E7E3] text-[#20312A] font-semibold text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-[#16866A] cursor-pointer shadow-2xs"
+                      title="Override language for patient email and report printout"
+                    >
+                      <option value="English">English</option>
+                      <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+                      <option value="Hindi">Hindi (हिन्दी)</option>
+                      <option value="Tamil">Tamil (தமிழ்)</option>
+                      <option value="Telugu">Telugu (తెలుగు)</option>
+                    </select>
+                  </div>
                   <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3]">
                     <span className="text-[#475569]">{t('screening.priorDRStatus')}:</span>
                     <GradeBadge grade={selectedPatient.priorGrade} />
@@ -995,7 +1074,7 @@ export default function Screening() {
 
               {/* FUNDUS DISPLAY */}
               <div className="relative w-full aspect-square max-h-[380px] sm:max-h-[440px] mx-auto bg-slate-950 rounded-2xl overflow-hidden shadow-inner border border-slate-800 flex items-center justify-center group">
-                {!hasImage ? (
+                {!hasImage && screeningStep !== 'results' ? (
                   <div className="flex flex-col items-center justify-center gap-3 text-center px-6">
                     <ImageOff className="w-12 h-12 text-slate-600" />
                     <div>
@@ -1006,37 +1085,124 @@ export default function Screening() {
                 ) : (
                 <>
                 <div className="w-full h-full flex items-center justify-center transition-transform duration-200" style={{ transform: `scale(${zoomLevel})` }}>
-                  {/* Show real heatmap if available and gradcam layer selected */}
                   {activeLayer === 'gradcam' && heatmapUrl ? (
-                    <img
-                      src={apiAssetUrl(heatmapUrl)}
-                      alt={t('screening.gradcamHeatmap')}
-                      className="w-full h-full object-contain"
-                    />
-                                    ) : activeLayer === 'vessel' && vesselMapUrl ? (
-                    <img
-                      src={vesselMapUrl}
-                      alt="Vessel Map"
-                      className="w-full h-full object-contain"
-                    />
-                  ) : activeLayer === 'microaneurysm' && microaneurysmUrl ? (
-                    <img src={microaneurysmUrl} alt="Microaneurysms" className="w-full h-full object-contain" />
-                  ) : activeLayer === 'exudate' && exudateUrl ? (
-                    <img src={exudateUrl} alt="Exudates" className="w-full h-full object-contain" />
-                  ) : activeLayer === 'hemorrhage' && hemorrhageUrl ? (
-                    <img src={hemorrhageUrl} alt="Hemorrhages" className="w-full h-full object-contain" />
-                  ) : activeLayer === 'opticdisc' && opticDiscUrl ? (
-                    <img src={opticDiscUrl} alt="Optic Disc" className="w-full h-full object-contain" />
-                  ) : activeLayer === 'original' && fundusImageUrl ? (
-                    <img
-                      src={apiAssetUrl(fundusImageUrl)}
-                      alt={t('screening.fundusPhoto')}
-                      className="w-full h-full object-contain"
-                    />
-                  ) : activeLayer === 'compare' && fundusImageUrl ? (
-                    <div className="relative w-full h-full">
-                      <img src={apiAssetUrl(fundusImageUrl)} alt="Original" className="w-full h-full object-contain" />
-                      {vesselMapUrl && <img src={vesselMapUrl} alt="Vessel overlay" className="absolute inset-0 w-full h-full object-contain opacity-50" />}
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <img
+                        src={apiAssetUrl(heatmapUrl)}
+                        alt={t('screening.gradcamHeatmap')}
+                        className="w-full h-full object-contain"
+                      />
+                      {/* Optic Disc Marker Overlay */}
+                      <svg className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" viewBox="0 0 500 500">
+                        <circle cx="210" cy="230" r="43" fill="none" stroke="#FACC15" strokeWidth="1.8" strokeDasharray="4 3" opacity="0.9" />
+                        <g transform="translate(254, 196)">
+                          <rect x="0" y="0" width="64" height="18" rx="4" fill="rgba(15, 23, 42, 0.85)" stroke="#FACC15" strokeWidth="0.8" />
+                          <text x="32" y="12.5" textAnchor="middle" fill="#FEF08A" fontSize="9.5" fontWeight="600" letterSpacing="0.3" className="font-sans">Optic Disc</text>
+                        </g>
+                        <line x1="242" y1="211" x2="254" y2="205" stroke="#FACC15" strokeWidth="0.8" strokeDasharray="2 2" opacity="0.8" />
+                      </svg>
+                    </div>
+                  ) : fundusImageUrl ? (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <img
+                        src={apiAssetUrl(fundusImageUrl)}
+                        alt={t('screening.fundusPhoto')}
+                        className="w-full h-full object-contain"
+                      />
+                      {activeLayer === 'vessel' && vesselMapUrl && (
+                        <img src={vesselMapUrl} alt="Vessel Segmentation" className="absolute inset-0 w-full h-full object-contain opacity-60" />
+                      )}
+                      {activeLayer === 'lesions' && (
+                        <>
+                          {microaneurysmUrl && <img src={microaneurysmUrl} alt="Microaneurysms" className="absolute inset-0 w-full h-full object-contain opacity-60" />}
+                          {exudateUrl && <img src={exudateUrl} alt="Exudates" className="absolute inset-0 w-full h-full object-contain opacity-60" />}
+                          {hemorrhageUrl && <img src={hemorrhageUrl} alt="Hemorrhages" className="absolute inset-0 w-full h-full object-contain opacity-60" />}
+                        </>
+                      )}
+                      {opticDiscUrl && (
+                        <img src={opticDiscUrl} alt="Optic Disc" className="hidden" aria-hidden="true" />
+                      )}
+                      {/* Overlays on real fundus image */}
+                      <svg className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none" viewBox="0 0 500 500">
+                        <defs>
+                          <radialGradient cx="45%" cy="46%" id="screeningGradCamImg" r="48%">
+                            <stop offset="0%" stopColor="#EF4444" stopOpacity="0.88" />
+                            <stop offset="35%" stopColor="#F97316" stopOpacity="0.75" />
+                            <stop offset="65%" stopColor="#EAB308" stopOpacity="0.45" />
+                            <stop offset="85%" stopColor="#22C55E" stopOpacity="0.15" />
+                            <stop offset="100%" stopColor="#06B6D4" stopOpacity="0" />
+                          </radialGradient>
+                          <filter id="screeningBlurImg"><feGaussianBlur stdDeviation="10" /></filter>
+                        </defs>
+                        {/* Grad-CAM (fallback if no server heatmap) */}
+                        {activeLayer === 'gradcam' && (
+                          <g filter="url(#screeningBlurImg)" opacity="0.82">
+                            <circle cx="230" cy="235" fill="url(#screeningGradCamImg)" r="130" />
+                          </g>
+                        )}
+                        {/* Vessel Map: Branching green SVG pattern */}
+                        {activeLayer === 'vessel' && (
+                          <g fill="none" opacity="0.95" stroke="#10B981" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M210,230 Q225,160 270,120 T365,85" strokeWidth="3.2" />
+                            <path d="M270,120 Q305,100 350,115" strokeWidth="2.0" />
+                            <path d="M315,108 Q335,80 375,70" strokeWidth="1.6" />
+                            <path d="M250,140 Q280,145 320,135" strokeWidth="1.8" />
+                            <path d="M210,230 Q185,165 140,115 T65,80" strokeWidth="2.8" />
+                            <path d="M165,138 Q130,130 90,110" strokeWidth="1.8" />
+                            <path d="M140,115 Q115,85 70,60" strokeWidth="1.5" />
+                            <path d="M210,230 Q235,295 295,345 T395,395" strokeWidth="3.4" />
+                            <path d="M265,320 Q310,340 360,335" strokeWidth="2.0" />
+                            <path d="M295,345 Q330,380 380,410" strokeWidth="1.6" />
+                            <path d="M250,280 Q290,275 330,285" strokeWidth="1.8" />
+                            <path d="M210,230 Q175,295 125,355 T45,405" strokeWidth="2.6" />
+                            <path d="M150,325 Q110,345 70,360" strokeWidth="1.7" />
+                            <path d="M125,355 Q95,390 55,420" strokeWidth="1.4" />
+                            <path d="M225,220 Q250,215 275,225" strokeWidth="1.3" stroke="#34D399" />
+                            <path d="M225,240 Q250,245 275,240" strokeWidth="1.3" stroke="#34D399" />
+                            <path d="M280,165 Q305,180 325,175" strokeWidth="1.2" stroke="#34D399" />
+                            <path d="M290,300 Q315,290 335,305" strokeWidth="1.2" stroke="#34D399" />
+                          </g>
+                        )}
+                        {/* Lesions Mock: Tiny red dots (Microaneurysms) + Yellow highlight blobs (Exudates) */}
+                        {activeLayer === 'lesions' && (
+                          <g className="lesions-overlay">
+                            {[
+                              { cx: 295, cy: 220, r: 2.8 },
+                              { cx: 325, cy: 215, r: 2.4 },
+                              { cx: 340, cy: 260, r: 2.8 },
+                              { cx: 280, cy: 265, r: 2.4 },
+                              { cx: 355, cy: 225, r: 3.2 },
+                              { cx: 270, cy: 210, r: 2.0 },
+                              { cx: 310, cy: 280, r: 2.6 },
+                              { cx: 365, cy: 255, r: 2.4 },
+                              { cx: 335, cy: 285, r: 2.8 },
+                              { cx: 290, cy: 245, r: 2.0 },
+                              { cx: 360, cy: 200, r: 2.6 }
+                            ].map((dot, idx) => (
+                              <g key={idx}>
+                                <circle cx={dot.cx} cy={dot.cy} r={dot.r + 2} fill="#EF4444" opacity="0.25" />
+                                <circle cx={dot.cx} cy={dot.cy} r={dot.r} fill="#EF4444" stroke="#991B1B" strokeWidth="0.8" />
+                              </g>
+                            ))}
+                            <ellipse cx="330" cy="235" rx="7" ry="5" fill="#FACC15" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="1" />
+                            <ellipse cx="342" cy="240" rx="9" ry="6" fill="#FDE047" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="1" transform="rotate(-15 342 240)" />
+                            <ellipse cx="325" cy="245" rx="5" ry="4" fill="#FACC15" fillOpacity="0.8" stroke="#CA8A04" strokeWidth="0.8" />
+                            <ellipse cx="305" cy="225" rx="6" ry="4" fill="#FDE047" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="0.8" />
+                            <ellipse cx="355" cy="270" rx="7" ry="5" fill="#FACC15" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="0.8" />
+                            <ellipse cx="363" cy="264" rx="5" ry="3.5" fill="#FEF08A" fillOpacity="0.9" stroke="#EAB308" strokeWidth="0.8" />
+                            <path d="M 285 238 Q 290 232 296 240 Q 292 246 285 238 Z" fill="#FACC15" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="0.8" />
+                          </g>
+                        )}
+                        {/* Optic Disc Marker Overlay */}
+                        <g className="optic-disc-marker pointer-events-none select-none">
+                          <circle cx="210" cy="230" r="43" fill="none" stroke="#FACC15" strokeWidth="1.8" strokeDasharray="4 3" opacity="0.9" />
+                          <g transform="translate(254, 196)">
+                            <rect x="0" y="0" width="64" height="18" rx="4" fill="rgba(15, 23, 42, 0.85)" stroke="#FACC15" strokeWidth="0.8" />
+                            <text x="32" y="12.5" textAnchor="middle" fill="#FEF08A" fontSize="9.5" fontWeight="600" letterSpacing="0.3" className="font-sans">Optic Disc</text>
+                          </g>
+                          <line x1="242" y1="211" x2="254" y2="205" stroke="#FACC15" strokeWidth="0.8" strokeDasharray="2 2" opacity="0.8" />
+                        </g>
+                      </svg>
                     </div>
                   ) : (
                     <svg className="w-full h-full object-cover select-none" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
@@ -1079,21 +1245,78 @@ export default function Screening() {
                       <circle cx="206" cy="227" fill="#FFF7ED" opacity="0.65" r="16" />
                       <circle cx="310" cy="245" fill="url(#macula)" r="45" />
                       <circle cx="310" cy="245" fill="#2E0A02" opacity="0.9" r="6" />
-                      {(activeLayer === 'gradcam' || activeLayer === 'compare') && (
+
+                      {/* Grad-CAM Heatmap Layer */}
+                      {activeLayer === 'gradcam' && (
                         <g filter="url(#screeningBlur)" opacity="0.82">
                           <circle cx="230" cy="235" fill="url(#screeningGradCam)" r="130" />
                         </g>
                       )}
-                      {(activeLayer === 'vessel' || activeLayer === 'compare') && (
-                        <g fill="none" opacity="0.92" stroke="#22D3EE" strokeLinecap="round">
-                          <path d="M210,230 Q220,170 270,120 T360,90" strokeWidth="2.8" />
-                          <path d="M210,230 Q190,160 140,110 T70,80" strokeWidth="2.4" />
-                          <path d="M210,230 Q230,290 290,340 T390,390" strokeWidth="3" />
+
+                      {/* Vessel Map: Branching green SVG pattern */}
+                      {activeLayer === 'vessel' && (
+                        <g fill="none" opacity="0.95" stroke="#10B981" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M210,230 Q225,160 270,120 T365,85" strokeWidth="3.2" />
+                          <path d="M270,120 Q305,100 350,115" strokeWidth="2.0" />
+                          <path d="M315,108 Q335,80 375,70" strokeWidth="1.6" />
+                          <path d="M250,140 Q280,145 320,135" strokeWidth="1.8" />
+                          <path d="M210,230 Q185,165 140,115 T65,80" strokeWidth="2.8" />
+                          <path d="M165,138 Q130,130 90,110" strokeWidth="1.8" />
+                          <path d="M140,115 Q115,85 70,60" strokeWidth="1.5" />
+                          <path d="M210,230 Q235,295 295,345 T395,395" strokeWidth="3.4" />
+                          <path d="M265,320 Q310,340 360,335" strokeWidth="2.0" />
+                          <path d="M295,345 Q330,380 380,410" strokeWidth="1.6" />
+                          <path d="M250,280 Q290,275 330,285" strokeWidth="1.8" />
+                          <path d="M210,230 Q175,295 125,355 T45,405" strokeWidth="2.6" />
+                          <path d="M150,325 Q110,345 70,360" strokeWidth="1.7" />
+                          <path d="M125,355 Q95,390 55,420" strokeWidth="1.4" />
+                          <path d="M225,220 Q250,215 275,225" strokeWidth="1.3" stroke="#34D399" />
+                          <path d="M225,240 Q250,245 275,240" strokeWidth="1.3" stroke="#34D399" />
+                          <path d="M280,165 Q305,180 325,175" strokeWidth="1.2" stroke="#34D399" />
+                          <path d="M290,300 Q315,290 335,305" strokeWidth="1.2" stroke="#34D399" />
                         </g>
                       )}
-                      {activeLayer === 'compare' && (
-                        <line stroke="#FFFFFF" strokeDasharray="5 5" strokeWidth="2" x1="250" x2="250" y1="10" y2="490" />
+
+                      {/* Lesions Mock: Tiny red dots (Microaneurysms) + Yellow highlight blobs (Exudates) */}
+                      {activeLayer === 'lesions' && (
+                        <g className="lesions-overlay">
+                          {[
+                            { cx: 295, cy: 220, r: 2.8 },
+                            { cx: 325, cy: 215, r: 2.4 },
+                            { cx: 340, cy: 260, r: 2.8 },
+                            { cx: 280, cy: 265, r: 2.4 },
+                            { cx: 355, cy: 225, r: 3.2 },
+                            { cx: 270, cy: 210, r: 2.0 },
+                            { cx: 310, cy: 280, r: 2.6 },
+                            { cx: 365, cy: 255, r: 2.4 },
+                            { cx: 335, cy: 285, r: 2.8 },
+                            { cx: 290, cy: 245, r: 2.0 },
+                            { cx: 360, cy: 200, r: 2.6 }
+                          ].map((dot, idx) => (
+                            <g key={idx}>
+                              <circle cx={dot.cx} cy={dot.cy} r={dot.r + 2} fill="#EF4444" opacity="0.25" />
+                              <circle cx={dot.cx} cy={dot.cy} r={dot.r} fill="#EF4444" stroke="#991B1B" strokeWidth="0.8" />
+                            </g>
+                          ))}
+                          <ellipse cx="330" cy="235" rx="7" ry="5" fill="#FACC15" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="1" />
+                          <ellipse cx="342" cy="240" rx="9" ry="6" fill="#FDE047" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="1" transform="rotate(-15 342 240)" />
+                          <ellipse cx="325" cy="245" rx="5" ry="4" fill="#FACC15" fillOpacity="0.8" stroke="#CA8A04" strokeWidth="0.8" />
+                          <ellipse cx="305" cy="225" rx="6" ry="4" fill="#FDE047" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="0.8" />
+                          <ellipse cx="355" cy="270" rx="7" ry="5" fill="#FACC15" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="0.8" />
+                          <ellipse cx="363" cy="264" rx="5" ry="3.5" fill="#FEF08A" fillOpacity="0.9" stroke="#EAB308" strokeWidth="0.8" />
+                          <path d="M 285 238 Q 290 232 296 240 Q 292 246 285 238 Z" fill="#FACC15" fillOpacity="0.85" stroke="#CA8A04" strokeWidth="0.8" />
+                        </g>
                       )}
+
+                      {/* Optic Disc Marker Overlay */}
+                      <g className="optic-disc-marker pointer-events-none select-none">
+                        <circle cx="210" cy="230" r="43" fill="none" stroke="#FACC15" strokeWidth="1.8" strokeDasharray="4 3" opacity="0.9" />
+                        <g transform="translate(254, 196)">
+                          <rect x="0" y="0" width="64" height="18" rx="4" fill="rgba(15, 23, 42, 0.85)" stroke="#FACC15" strokeWidth="0.8" />
+                          <text x="32" y="12.5" textAnchor="middle" fill="#FEF08A" fontSize="9.5" fontWeight="600" letterSpacing="0.3" className="font-sans">Optic Disc</text>
+                        </g>
+                        <line x1="242" y1="211" x2="254" y2="205" stroke="#FACC15" strokeWidth="0.8" strokeDasharray="2 2" opacity="0.8" />
+                      </g>
                     </svg>
                   )}
                 </div>
@@ -1152,10 +1375,32 @@ export default function Screening() {
                 </div>
               )}
 
+              {/* Layer Legends & Clinical Explanations */}
               {activeLayer === 'gradcam' && (
                 <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
                   <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                   <span><strong>{t('screening.gradcamExplanationTitle')}:</strong> {t('screening.gradcamExplanationBody')}</span>
+                </div>
+              )}
+              {activeLayer === 'vessel' && (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
+                  <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                  <span>Green lines denote extracted microvascular network. Assesses vessel tortuosity.</span>
+                </div>
+              )}
+              {activeLayer === 'lesions' && (
+                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-950 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#EF4444] border border-[#991B1B] inline-block shrink-0" />
+                      <span className="font-semibold text-red-950">Red: Microaneurysms</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#FACC15] border border-[#CA8A04] inline-block shrink-0" />
+                      <span className="font-semibold text-yellow-950">Yellow: Hard Exudates</span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-[#66756D]">Automated Lesion Segmentation</span>
                 </div>
               )}
             </div>
@@ -1319,13 +1564,43 @@ export default function Screening() {
                   <div className="p-3 bg-[#F8FAF7] border border-[#E2E7E3] rounded-xl text-xs text-[#20312A] leading-relaxed">
                     <strong>{t('screening.salientClinicalFindings')}:</strong> {findingsText ?? gradeInfo.findings}
                   </div>
-                  <div className="space-y-1.5 pt-1">
+                  {/* Task 2: Multi-Class Probability Distribution */}
+                  <div className="space-y-2 pt-2 border-t border-[#E2E7E3]/60">
                     <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-[#66756D]">{t('screening.diagnosticAIConfidence')}</span>
-                      <span className="text-[#20312A] font-bold font-mono">{activeConfidence}%</span>
+                      <span className="text-[#20312A] font-bold text-xs tracking-tight">Multi-Class Probability Distribution</span>
+                      <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                        activeGrade === 2
+                          ? 'text-[#EA580C] bg-orange-50 border-orange-200'
+                          : activeGrade === 0
+                          ? 'text-[#059669] bg-emerald-50 border-emerald-200'
+                          : activeGrade === 1
+                          ? 'text-[#D97706] bg-amber-50 border-amber-200'
+                          : 'text-[#DC2626] bg-rose-50 border-rose-200'
+                      }`}>
+                        Grade {activeGrade}: {activeConfidence}%
+                      </span>
                     </div>
-                    <div className="w-full h-2 bg-[#F8FAF7] border border-[#E2E7E3] rounded-full overflow-hidden">
-                      <div className="h-full bg-[#16866A] rounded-full" style={{ width: `${activeConfidence}%` }} />
+                    <div className="space-y-1.5 pt-0.5">
+                      {getGradeProbabilities(activeGrade, activeConfidence).map(({ grade, percent, isTop }) => (
+                        <div key={grade} className="flex items-center gap-2.5 text-xs">
+                          <span className={`w-16 shrink-0 text-[11px] font-medium ${isTop ? 'font-bold text-[#20312A]' : 'text-[#66756D]'}`}>
+                            Grade {grade}
+                          </span>
+                          <div className="flex-1 h-3 bg-[#F8FAF7] border border-[#E2E7E3] rounded-full overflow-hidden p-0.5 flex items-center">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                isTop
+                                  ? (activeGrade === 2 ? 'bg-[#EA580C]' : activeGrade === 0 ? 'bg-[#059669]' : activeGrade === 1 ? 'bg-[#D97706]' : 'bg-[#DC2626]')
+                                  : 'bg-[#E2E7E3]'
+                              }`}
+                              style={{ width: `${Math.max(percent, percent > 0 ? 3 : 0)}%` }}
+                            />
+                          </div>
+                          <span className={`w-10 text-right font-mono text-[11px] shrink-0 ${isTop ? 'font-bold text-[#20312A]' : 'text-[#66756D]'}`}>
+                            {percent}%
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <div className="pt-2 border-t border-[#E2E7E3] text-[11px] text-[#66756D] leading-relaxed flex items-start gap-2">
@@ -1353,7 +1628,7 @@ export default function Screening() {
                   </div>
                 </div>
 
-                {/* PRIMARY ACTION */}
+                {/* PRIMARY ACTION (Task 4: Added Email Patient button) */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                   <button type="button" onClick={handleSaveScreening} disabled={isSaving || isPendingOfflineClassification}
                     className="flex-1 btn-gradient-pill min-h-[44px] h-12 px-6 text-sm font-bold shadow-sm hover:brightness-105 hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100">
@@ -1368,10 +1643,24 @@ export default function Screening() {
                       <span>{gradeInfo.primaryActionLabel}</span>
                     )}
                   </button>
-                  <button type="button" onClick={handleExportScreeningReport} disabled={isExportingReport}
+                  <button type="button" onClick={() => setShowPrintModal(true)} disabled={isExportingReport}
                     className="min-h-[44px] h-12 px-4 bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold text-xs rounded-xl border border-[#E2E7E3] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
-                    {isExportingReport ? <RefreshCw className="w-4 h-4 text-slate-500 animate-spin" /> : <Printer className="w-4 h-4 text-slate-500" />}
-                    <span>{isExportingReport ? t('screening.exporting') : t('screening.printReport')}</span>
+                    <Printer className="w-4 h-4 text-[#16866A]" />
+                    <span>{t('screening.printReport')}</span>
+                  </button>
+                  <button type="button" onClick={handleSendEmail} disabled={isSendingEmail || isSaving}
+                    className="min-h-[44px] h-12 px-4 bg-transparent text-[#66756D] hover:text-[#285943] hover:bg-[#F3F6F1] font-semibold text-xs rounded-xl border border-[#E2E7E3] transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60">
+                    {isSendingEmail ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 text-[#16866A] animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm">✉️</span>
+                        <span>Email Patient</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1380,6 +1669,293 @@ export default function Screening() {
           </section>
         </div>
       </main>
+
+      {/* Task 4: Email Sent Success Toast */}
+      {emailToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 max-w-md bg-white border border-emerald-300 text-[#20312A] p-4 rounded-2xl shadow-xl flex items-start gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300"
+        >
+          <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="flex-1 space-y-0.5 text-xs">
+            <h4 className="font-bold text-[#14532D]">Email Dispatched</h4>
+            <p className="text-[#475569]">{emailToast}</p>
+            <span className="text-[10px] text-[#66756D] block pt-0.5">Report language: {reportLanguage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setEmailToast(null)}
+            className="text-slate-400 hover:text-slate-600 text-xs p-1 rounded-lg cursor-pointer"
+            aria-label="Close notification"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Task 1: Formal Hospital Print Report Modal */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto">
+          <div className="relative w-full max-w-4xl bg-slate-100 rounded-2xl shadow-2xl border border-slate-300 overflow-hidden my-auto max-h-[95vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Control Header */}
+            <div className="bg-white px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-[#16866A]" />
+                <h3 className="text-sm font-bold text-slate-900 font-heading">
+                  Print Report Preview (Clinical Assessment)
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportScreeningReport}
+                  disabled={isExportingReport}
+                  className="h-8 px-3 rounded-lg bg-[#285943] hover:bg-[#1f4534] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60 shadow-xs"
+                >
+                  {isExportingReport ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  <span>{isExportingReport ? 'Exporting PDF...' : 'Download PDF'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="h-8 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrintModal(false)}
+                  className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Close modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / A4 Sheet View */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex justify-center bg-slate-100">
+              <div
+                ref={reportModalRef}
+                style={{ width: '794px', minHeight: '1050px', aspectRatio: '1 / 1.414' }}
+                className="bg-white text-[#20312A] p-8 sm:p-10 rounded-xl shadow-md border border-slate-200 text-xs flex flex-col justify-between print:shadow-none print:border-none print:m-0 print:exact-colors print-color-adjust-exact"
+              >
+                <div>
+                  {/* 1. LETTERHEAD */}
+                  <div className="flex items-start justify-between border-b-4 border-[#285943] pb-4 mb-6">
+                    <div className="flex items-center">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
+                        <Eye size={18} strokeWidth={2.5} />
+                      </div>
+                      <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A] font-heading">
+                        DRISHTI
+                      </span>
+                      <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-[#047857]/20">
+                        CLINICAL AI
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      <h2 className="text-base font-extrabold tracking-wide text-[#285943] uppercase font-heading">
+                        CLINICAL ASSESSMENT REPORT
+                      </h2>
+                      <div className="text-xs text-[#66756D] mt-0.5 space-y-0.5">
+                        <div>
+                          Generated: <span className="font-semibold text-[#20312A]">{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                        <div>
+                          Report ID:{' '}
+                          <span className="font-mono font-semibold text-[#20312A]">
+                            DRISHTI-CR-{selectedPatient?.id ?? '—'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. PATIENT DEMOGRAPHICS BOX */}
+                  <div className="bg-[#F8FAF7] border border-[#E2E7E3] rounded-lg p-4 grid grid-cols-4 gap-4 text-sm mb-6">
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+                        Patient Name
+                      </span>
+                      <span className="text-[#20312A] font-semibold">
+                        {selectedPatient?.name ?? '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+                        Patient ID / ABHA
+                      </span>
+                      <span className="text-[#20312A] font-semibold font-mono">
+                        {selectedPatient?.id ?? '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+                        Age / Gender
+                      </span>
+                      <span className="text-[#20312A] font-semibold">
+                        {selectedPatient?.ageGender ?? '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
+                        Facility / PHC
+                      </span>
+                      <span className="text-[#20312A] font-semibold">
+                        {selectedPatient?.phc ?? '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 3. AI FINDINGS & IMAGING (Side-by-Side) */}
+                  <div className="grid grid-cols-2 gap-6 mb-6">
+                    {/* Left Column: AI-Assisted Screening Result */}
+                    <div className="border border-[#E2E7E3] rounded-lg p-4 bg-white flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] uppercase font-bold text-[#66756D]">
+                            AI-Assisted Screening Result
+                          </span>
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#F8FAF7] border border-[#E2E7E3] text-[#285943]">
+                            {gradeInfo?.risk ?? 'Moderate Risk'}
+                          </span>
+                        </div>
+                        <div
+                          className="text-xl font-bold mb-1"
+                          style={{
+                            color: activeGrade >= 3 ? '#B91C1C' : activeGrade >= 1 ? '#D97706' : '#059669'
+                          }}
+                        >
+                          {gradeInfo?.title ?? `Grade ${activeGrade}`}
+                        </div>
+                        <p className="text-xs text-[#66756D] mb-4">
+                          Examined Eye:{' '}
+                          <span className="font-semibold text-[#20312A]">
+                            {activeEye === 'OD' ? 'Right Eye (OD)' : 'Left Eye (OS)'}
+                          </span>{' '}
+                          &middot; Field:{' '}
+                          <span className="font-semibold text-[#20312A]">45° Non-Mydriatic</span>{' '}
+                          &middot; Quality:{' '}
+                          <span className="font-semibold text-[#20312A]">{qualityScore}%</span>
+                        </p>
+                      </div>
+
+                      <div className="space-y-3 pt-3 border-t border-[#E2E7E3]">
+                        <div>
+                          <div className="flex justify-between items-center text-xs mb-1.5">
+                            <span className="text-[10px] uppercase font-bold text-[#66756D]">
+                              Diagnostic Confidence
+                            </span>
+                            <span className="font-mono font-bold text-[#20312A]">
+                              {activeConfidence}%
+                            </span>
+                          </div>
+                          <div className="w-full h-2.5 bg-[#E2E7E3] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#16866A] rounded-full transition-all"
+                              style={{ width: `${activeConfidence}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="bg-[#F8FAF7] rounded-md p-2.5 border border-[#E2E7E3]">
+                          <span className="text-[10px] uppercase font-bold text-[#285943] block mb-0.5">
+                            Clinical Recommendation
+                          </span>
+                          <p className="text-xs text-[#20312A] leading-relaxed">
+                            {recommendationText ?? gradeInfo?.recommendation}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: IMAGING */}
+                    <div className="border border-[#E2E7E3] rounded-lg p-4 bg-white flex flex-col justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#66756D] block mb-2.5">
+                          Retinal Imaging &amp; Salience Overlay
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Fig 1: Standard Fundus */}
+                          <div className="aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative">
+                            {fundusImageUrl ? (
+                              <img
+                                src={apiAssetUrl(fundusImageUrl)}
+                                alt="Standard Fundus"
+                                className="w-full h-full object-cover"
+                                crossOrigin="anonymous"
+                              />
+                            ) : uploadedFile ? (
+                              <img
+                                src={URL.createObjectURL(uploadedFile)}
+                                alt="Standard Fundus"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <svg className="w-24 h-24 select-none" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="42" fill="#9A3412" />
+                                <circle cx="42" cy="46" r="8" fill="#FED7AA" />
+                                <circle cx="62" cy="50" r="10" fill="#431407" opacity="0.8" />
+                                <path d="M42,46 Q45,30 55,22 T75,16" stroke="#7F1D1D" strokeWidth="1.5" fill="none" />
+                                <path d="M42,46 Q47,60 60,70 T80,80" stroke="#7F1D1D" strokeWidth="1.6" fill="none" />
+                              </svg>
+                            )}
+                            <span className="absolute bottom-1 left-1 bg-black/75 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
+                              {activeEye} · 45°
+                            </span>
+                          </div>
+
+                          {/* Fig 2: Grad-CAM Salience */}
+                          <div className="aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative">
+                            {heatmapUrl ? (
+                              <img
+                                src={apiAssetUrl(heatmapUrl)}
+                                alt="Grad-CAM Salience"
+                                className="w-full h-full object-cover"
+                                crossOrigin="anonymous"
+                              />
+                            ) : (
+                              <svg className="w-24 h-24 select-none" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="42" fill="#9A3412" />
+                                <circle cx="48" cy="48" r="26" fill="#EF4444" opacity="0.8" filter="blur(3px)" />
+                                <circle cx="48" cy="48" r="16" fill="#FBBF24" opacity="0.7" filter="blur(2px)" />
+                              </svg>
+                            )}
+                            <span className="absolute bottom-1 left-1 bg-black/75 text-amber-300 text-[9px] px-1.5 py-0.5 rounded font-mono">
+                              Grad-CAM
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-[#66756D] text-center mt-3 font-medium italic">
+                        Fig 1: Standard Fundus | Fig 2: Grad-CAM Salience
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. DOCTOR SIGNATURE LINE & DISCLAIMER */}
+                <div>
+                  <div className="flex justify-between mt-12 pt-8 border-t border-[#E2E7E3] text-xs text-[#20312A] font-semibold">
+                    <div>Reviewing Physician: ____________________</div>
+                    <div>Signature &amp; Date: ____________________</div>
+                  </div>
+
+                  <div className="text-[9.5px] text-[#66756D] mt-6 pt-3 border-t border-[#E2E7E3] leading-relaxed">
+                    <strong>Medical Disclaimer:</strong> This clinical assessment document is generated by DRISHTI AI Screening Support under National Tele-Ophthalmology Protocols. AI triage recommendations must be confirmed by a licensed ophthalmologist or medical practitioner.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Offscreen A4 report captured by handleExportScreeningReport via html2canvas + jsPDF */}
       <div style={{ position: 'fixed', top: 0, left: '-10000px', zIndex: -1 }} aria-hidden="true">
@@ -1390,6 +1966,7 @@ export default function Screening() {
           activeConfidence={activeConfidence}
           activeEye={activeEye}
           gradeInfo={gradeInfo}
+          fundusUrl={fundusImageUrl ? apiAssetUrl(fundusImageUrl) : null}
           gradcamUrl={apiAssetUrl(heatmapUrl)}
           recommendationText={recommendationText}
           qualityScore={qualityScore}

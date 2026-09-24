@@ -313,7 +313,8 @@ export default function Dashboard() {
 
           {/* Desktop Table */}
           <div className="hidden md:block bg-white border border-[#E2E7E3] rounded-2xl shadow-[0_2px_12px_rgba(40,89,67,0.04)] overflow-hidden">
-            <table className="w-full text-left border-collapse">
+            <div className="w-full overflow-x-auto pb-4">
+              <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#F8FAF7] border-b border-[#E2E7E3] text-[11px] font-semibold uppercase tracking-wider text-[#475569]">
                   <th className="py-4 px-6 font-semibold" scope="col">{t('dashboard.patient')}</th>
@@ -369,6 +370,7 @@ export default function Dashboard() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Mobile Cards */}
