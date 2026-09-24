@@ -10,3 +10,6 @@
 # Logs
 logs/
 *.log
+
+# Static patient reports
+static/reports/

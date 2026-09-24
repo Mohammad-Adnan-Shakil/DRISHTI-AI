@@ -106,6 +106,22 @@ const ScreeningReportPDF = forwardRef(function ScreeningReportPDF(
               {patient?.phc ?? '—'}
             </span>
           </div>
+          {(patient?.phone || patient?.email) && (
+            <div className="col-span-4 pt-2 border-t border-[#E2E7E3]/60 flex items-center gap-6 text-xs text-[#66756D]">
+              {patient?.phone && (
+                <div>
+                  <span className="font-bold uppercase text-[10px] text-[#66756D] mr-1.5">Phone:</span>
+                  <span className="font-semibold text-[#20312A]">{patient.phone}</span>
+                </div>
+              )}
+              {patient?.email && (
+                <div>
+                  <span className="font-bold uppercase text-[10px] text-[#66756D] mr-1.5">Email:</span>
+                  <span className="font-semibold text-[#20312A]">{patient.email}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 3. AI FINDINGS & IMAGING (Side-by-Side) */}

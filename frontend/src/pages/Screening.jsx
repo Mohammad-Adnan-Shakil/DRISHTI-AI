@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   Search,
@@ -30,13 +30,14 @@ import { useTranslation } from 'react-i18next'
 import GradeBadge from '../components/GradeBadge'
 import ScreeningReportPDF from '../components/ScreeningReportPDF'
 import { handleZoomIn, handleZoomOut, handleZoomReset } from '../lib/zoomHandlers'
-import { exportNodeToPdf, sanitizeFilenameSegment } from '../lib/pdfExport'
+import { exportNodeToPdf, nodeToPdfBlob, sanitizeFilenameSegment } from '../lib/pdfExport'
 import {
   qualityCheck,
   classify,
   explain,
   recommend,
   saveScreening,
+  uploadScreeningReport,
   createReferral,
   getPatient,
   apiAssetUrl
@@ -94,6 +95,8 @@ function mapApiPatientToDisplay(patient) {
     realId: patient.id,
     id: String(patient.id),
     name: patient.name,
+    phone: patient.phone || null,
+    email: patient.email || null,
     initials,
     ageGender: patient.age != null && patient.gender
       ? `${patient.age}${patient.gender[0].toUpperCase()} (${patient.age} yrs • ${patient.gender})`
@@ -384,38 +387,68 @@ export default function Screening() {
   const zoomOut = () => handleZoomOut(setZoomLevel)
   const zoomReset = () => handleZoomReset(setZoomLevel)
 
+  const allPatientsMap = useMemo(() => {
+    return { ...PATIENTS, ...apiPatients }
+  }, [apiPatients])
+
+  const filteredPatients = useMemo(() => {
+    const list = Object.values(allPatientsMap)
+    if (!searchQuery.trim()) return list
+    const q = searchQuery.toLowerCase().trim()
+    return list.filter(p => {
+      const nameMatch = p.name && p.name.toLowerCase().includes(q)
+      const idMatch = p.id && String(p.id).toLowerCase().includes(q)
+      const realIdMatch = p.realId && String(p.realId).toLowerCase().includes(q)
+      const phoneMatch = p.phone && String(p.phone).toLowerCase().includes(q)
+      return nameMatch || idMatch || realIdMatch || phoneMatch
+    })
+  }, [allPatientsMap, searchQuery])
+
   const handleSearchSubmit = async (e) => {
     e.preventDefault()
     const query = searchQuery.trim()
     setPatientLookupError(null)
 
-    // Real patient IDs from the backend are integers (see POST /api/patient).
-    // Only hit the API when the query looks like one — otherwise fall through
-    // to the local demo patients below.
-    if (/^\d+$/.test(query)) {
+    if (!query) {
+      setSelectedPatientId('DRI-2026-00421')
+      return
+    }
+
+    // 1. Try finding in filtered patients or loaded patients first
+    const match = filteredPatients[0] || Object.values(allPatientsMap).find(p => {
+      const q = query.toLowerCase()
+      return (
+        (p.name && p.name.toLowerCase().includes(q)) ||
+        (p.id && String(p.id).toLowerCase().includes(q)) ||
+        (p.realId && String(p.realId).toLowerCase().includes(q)) ||
+        (p.phone && String(p.phone).toLowerCase().includes(q))
+      )
+    })
+
+    if (match) {
+      setSelectedPatientId(match.id)
+      return
+    }
+
+    // 2. If query contains an integer, try looking up via API
+    const numMatch = query.match(/\d+/)
+    if (numMatch) {
+      const candidateId = numMatch[0]
       setPatientLookupLoading(true)
       try {
-        const patient = await getPatient(query)
+        const patient = await getPatient(candidateId)
         const mapped = mapApiPatientToDisplay(patient)
         setApiPatients(prev => ({ ...prev, [mapped.id]: mapped }))
         setSelectedPatientId(mapped.id)
         return
       } catch (err) {
         console.error('Patient lookup failed:', err)
-        setPatientLookupError(t('screening.noPatientFound', { query }))
       } finally {
         setPatientLookupLoading(false)
       }
-      return
     }
 
-    if (query.toLowerCase().includes('00418') || query.toLowerCase().includes('ramesh')) {
-      setSelectedPatientId('DRI-2026-00418')
-    } else if (query) {
-      setPatientLookupError(t('screening.noPatientMatching', { query }))
-    } else {
-      setSelectedPatientId('DRI-2026-00421')
-    }
+    setPatientLookupError(t('screening.noPatientMatching', { query }))
   }
 
   // File upload handler — calls quality check API
@@ -684,6 +717,15 @@ export default function Screening() {
         setSavedScreeningId(screeningId)
       }
 
+      // Automatically capture offscreen report PDF and upload to backend
+      const captureNode = reportPdfRef.current || reportModalRef.current
+      if (captureNode && screeningId) {
+        nodeToPdfBlob(captureNode)
+          .then(({ blob }) => uploadScreeningReport(screeningId, blob))
+          .then(res => console.info(`[Screening] Automatically uploaded PDF report for screening ${screeningId}:`, res))
+          .catch(uploadErr => console.error('[Screening] Auto-upload of PDF report failed:', uploadErr))
+      }
+
       if (activeGrade >= 2) {
         await createReferral({
           screening_id: screeningId,
@@ -722,7 +764,19 @@ export default function Screening() {
       const dateStr = new Date().toISOString().slice(0, 10)
       const filenameSafeId = sanitizeFilenameSegment(String(selectedPatient.id))
       const targetNode = reportModalRef.current || reportPdfRef.current
-      await exportNodeToPdf(targetNode, `DRISHTI_Screening_${filenameSafeId}_${dateStr}.pdf`)
+      const targetScreeningId = savedScreeningId || selectedPatient?.screeningId || (typeof selectedPatient?.realId === 'number' ? selectedPatient.realId : null)
+
+      const { blob } = await exportNodeToPdf(
+        targetNode,
+        `DRISHTI_Screening_${filenameSafeId}_${dateStr}.pdf`,
+        { screeningId: targetScreeningId }
+      )
+
+      if (blob && targetScreeningId && !String(targetScreeningId).startsWith('DRI-')) {
+        uploadScreeningReport(targetScreeningId, blob).catch(err => {
+          console.error('[Screening] Background upload of report PDF failed:', err)
+        })
+      }
     } catch (err) {
       console.error('Export screening report PDF failed:', err)
     } finally {
@@ -902,17 +956,28 @@ export default function Screening() {
                 <p className="mt-2 text-[11px] text-rose-600 font-medium">{patientLookupError}</p>
               )}
               <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
-                <span className="text-[#66756D] text-[11px]">{t('screening.recent')}</span>
-                {['DRI-2026-00421', 'DRI-2026-00418'].map(pid => (
-                  <button key={pid} type="button" onClick={() => setSelectedPatientId(pid)}
+                <span className="text-[#66756D] text-[11px]">
+                  {searchQuery.trim() ? `Matches (${filteredPatients.length}):` : t('screening.recent')}
+                </span>
+                {(searchQuery.trim() ? filteredPatients : Object.values(allPatientsMap).slice(0, 4)).map(p => (
+                  <button key={p.id} type="button" onClick={() => setSelectedPatientId(p.id)}
                     className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-all cursor-pointer ${
-                      selectedPatientId === pid
+                      selectedPatientId === p.id
                         ? 'bg-[#E6F4EA] text-[#047857] border-[#047857]/30 font-bold'
                         : 'bg-[#F8FAF7] text-[#20312A] border-[#E2E7E3] hover:bg-slate-100'
                     }`}>
-                    {PATIENTS[pid].name} ({pid.slice(-5)})
+                    {p.name} ({String(p.id).length > 8 ? String(p.id).slice(-5) : p.id})
                   </button>
                 ))}
+                {searchQuery.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="text-[11px] text-[#16866A] hover:underline ml-auto font-medium cursor-pointer"
+                  >
+                    Clear filter
+                  </button>
+                )}
               </div>
             </div>
 
@@ -991,6 +1056,18 @@ export default function Screening() {
                     <span className="text-[#475569]">{t('screening.primaryABHAID')}:</span>
                     <span className="font-mono font-medium text-[#20312A]">{selectedPatient.abhaId}</span>
                   </div>
+                  {selectedPatient.phone && (
+                    <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3]">
+                      <span className="text-[#475569]">Phone:</span>
+                      <span className="font-mono font-medium text-[#20312A]">{selectedPatient.phone}</span>
+                    </div>
+                  )}
+                  {selectedPatient.email && (
+                    <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3]">
+                      <span className="text-[#475569]">Email:</span>
+                      <span className="font-mono font-medium text-[#20312A]">{selectedPatient.email}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="pt-2">
                   <Link to={`/history/${selectedPatient.id}`}
@@ -1811,6 +1888,22 @@ export default function Screening() {
                         {selectedPatient?.phc ?? '—'}
                       </span>
                     </div>
+                    {(selectedPatient?.phone || selectedPatient?.email) && (
+                      <div className="col-span-4 pt-2 border-t border-[#E2E7E3]/60 flex items-center gap-6 text-xs text-[#66756D]">
+                        {selectedPatient?.phone && (
+                          <div>
+                            <span className="font-bold uppercase text-[10px] text-[#66756D] mr-1.5">Phone:</span>
+                            <span className="font-semibold text-[#20312A]">{selectedPatient.phone}</span>
+                          </div>
+                        )}
+                        {selectedPatient?.email && (
+                          <div>
+                            <span className="font-bold uppercase text-[10px] text-[#66756D] mr-1.5">Email:</span>
+                            <span className="font-semibold text-[#20312A]">{selectedPatient.email}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* 3. AI FINDINGS & IMAGING (Side-by-Side) */}

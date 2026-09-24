@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -17,6 +17,7 @@ class Patient(Base):
     hypertension            = Column(Boolean, default=False)
     family_history_dr       = Column(Boolean, default=False)
     preferred_language      = Column(String, default="english")
+    consent                 = Column(Boolean, default=True, nullable=True)
 
     diabetes_duration_score = Column(Integer, nullable=True)
     hba1c_score              = Column(Integer, nullable=True)

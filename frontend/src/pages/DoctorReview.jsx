@@ -189,7 +189,23 @@ export default function DoctorReview() {
 
   const handleSaveDraft = () => {
     setIsDraftSaved(true)
-    setTimeout(() => setIsDraftSaved(false), 2000)
+    try {
+      localStorage.setItem(`drishti_draft_${patientId}`, JSON.stringify({
+        isAiAgreed,
+        concurrenceNotes,
+        overrideGrade,
+        overrideAssessment,
+        referralTimeline,
+        treatmentPlan,
+        savedAt: new Date().toISOString()
+      }))
+    } catch (e) {
+      console.warn('Failed to save draft locally:', e)
+    }
+    setToastMessage('Draft saved · Returning to review queue')
+    setTimeout(() => {
+      navigate('/doctor-dashboard')
+    }, 600)
   }
 
   // Helper text for current layer

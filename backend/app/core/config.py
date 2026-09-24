@@ -1,4 +1,4 @@
-﻿from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings
 
 from pathlib import Path
 
@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
     DATABASE_SSL: bool = True
     JWT_SECRET_KEY: str = "drishti-sih-2026-secret-key-change-in-production"
+    EMAIL_PROVIDER: str = "smtp"
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAIL_FROM_NAME: str = "DRISHTI-AI Screening"
 
     @property
     def model_path(self) -> Path:
@@ -25,5 +31,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()

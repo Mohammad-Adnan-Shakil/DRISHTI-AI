@@ -1,4 +1,7 @@
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -18,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 Path(STATIC_DIR / "screenings/fundus").mkdir(parents=True, exist_ok=True)
 Path(STATIC_DIR / "screenings/gradcam").mkdir(parents=True, exist_ok=True)
+Path(STATIC_DIR / "reports").mkdir(parents=True, exist_ok=True)
 
 
 def cleanup_staging_files(max_age_hours: int = 24):

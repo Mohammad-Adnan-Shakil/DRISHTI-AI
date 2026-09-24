@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Column, Integer, Float, Boolean, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, Float, Boolean, String, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -20,4 +20,6 @@ class Screening(Base):
     reviewed                = Column(Boolean, default=False)
     recommendation_text     = Column(Text, nullable=True)
     recommendation_language = Column(String, default="english")
+    email_status            = Column(String, nullable=True)  # "sent" | "failed" | "skipped"
+    email_sent_at           = Column(DateTime(timezone=True), nullable=True)
     created_at              = Column(DateTime(timezone=True), server_default=func.now())

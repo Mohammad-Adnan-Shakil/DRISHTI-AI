@@ -115,6 +115,12 @@ export async function saveScreening(payload) {
   return post(API_URL, '/api/screening', payload)
 }
 
+export async function uploadScreeningReport(screeningId, pdfBlob) {
+  const form = new FormData()
+  form.append('file', pdfBlob, `screening_${screeningId}_report.pdf`)
+  return post(API_URL, `/api/screenings/${screeningId}/report`, form, true)
+}
+
 export async function getPendingScreenings() {
   return get(API_URL, '/api/screenings/pending')
 }

@@ -16,6 +16,7 @@ backend/static/uploads/
 backend/static/temp/
 backend/static/heatmaps/
 backend/static/screenings/
+backend/static/reports/
 
 # Model weights
 ml/models/*.pth

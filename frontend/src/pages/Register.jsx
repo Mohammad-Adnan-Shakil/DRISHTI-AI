@@ -91,6 +91,8 @@ export default function Register() {
     fullName: '',
     age: '',
     gender: '',
+    phone: '',
+    email: '',
     patientId: '',
     diabetesDuration: '',
     hba1c: '',
@@ -156,6 +158,7 @@ export default function Register() {
     try {
       const result = await createPatient({
         name: formData.fullName,
+        phone: formData.phone || null,
         email: formData.email || null,
         age: parseInt(formData.age),
         gender: formData.gender,
@@ -270,12 +273,6 @@ export default function Register() {
                     {errors.age && <div className="text-xs text-[#DC2626] mt-1.5 flex items-center gap-1 font-medium"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /><span>{errors.age}</span></div>}
                   </div>
                                     <div>
-                    <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="email">Email Address <span className="text-slate-400 font-normal">(optional)</span></label>
-                    <input id="email" type="email" placeholder="patient@example.com" value={formData.email || ''} onChange={(e) => handleInputChange('email', e.target.value)}
-                      className="touch-target w-full h-11 rounded-xl border px-3.5 text-sm text-[#20312A] placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] transition-all border-[#E2E7E3] bg-white" />
-                    <p className="text-[11px] text-[#66756D] mt-1">Used to send screening results to patient or guardian</p>
-                  </div>
-                  <div>
                     <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="gender">{t('register.gender')} <span className="text-rose-600 font-bold">*</span></label>
                     <select id="gender" value={formData.gender} onChange={(e) => handleInputChange('gender', e.target.value)}
                       className={`touch-target w-full h-11 rounded-xl border px-3.5 pr-10 text-sm text-[#20312A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] appearance-none cursor-pointer transition-all ${errors.gender ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E2E7E3] bg-white'}`}>
@@ -285,6 +282,18 @@ export default function Register() {
                       <option value="Other">{t('register.other')}</option>
                     </select>
                     {errors.gender && <div className="text-xs text-[#DC2626] mt-1.5 flex items-center gap-1 font-medium"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /><span>{errors.gender}</span></div>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="phone">Phone Number <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <input id="phone" type="tel" placeholder="+91 98765 43210" value={formData.phone || ''} onChange={(e) => handleInputChange('phone', e.target.value)}
+                      className="touch-target w-full h-11 rounded-xl border px-3.5 text-sm text-[#20312A] placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] transition-all border-[#E2E7E3] bg-white" />
+                    <p className="text-[11px] text-[#66756D] mt-1">Used for SMS alerts and referral follow-ups</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="email">Email Address <span className="text-slate-400 font-normal">(optional)</span></label>
+                    <input id="email" type="email" placeholder="patient@example.com" value={formData.email || ''} onChange={(e) => handleInputChange('email', e.target.value)}
+                      className="touch-target w-full h-11 rounded-xl border px-3.5 text-sm text-[#20312A] placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16866A] transition-all border-[#E2E7E3] bg-white" />
+                    <p className="text-[11px] text-[#66756D] mt-1">Used to send screening results to patient or guardian</p>
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-semibold text-slate-800 mb-1.5" htmlFor="patientId">{t('register.patientIdLabel')}</label>

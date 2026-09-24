@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -22,6 +22,7 @@ class PatientCreate(BaseModel):
     hypertension: bool = False
     family_history_dr: bool = False
     preferred_language: str = "english"
+    consent: Optional[bool] = True
 
     diabetes_duration_score: Optional[int] = None
     hba1c_score: Optional[int] = None
@@ -46,6 +47,7 @@ class PatientResponse(BaseModel):
     hypertension: bool
     family_history_dr: bool
     preferred_language: str
+    consent: Optional[bool] = True
 
     diabetes_duration_score: Optional[int] = None
     hba1c_score: Optional[int] = None
@@ -141,3 +143,24 @@ async def get_patient_history(patient_id: int, db: AsyncSession = Depends(get_db
         }
         for s in screenings
     ]
+
+class PatientUpdate(BaseModel):
+    name: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    phc_id: Optional[str] = None
+    consent: Optional[bool] = None
+
+@router.patch("/patient/{patient_id}", response_model=PatientResponse)
+async def update_patient(patient_id: int, data: PatientUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Patient).where(Patient.id == patient_id))
+    patient = result.scalar_one_or_none()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(patient, key, value)
+    await db.commit()
+    await db.refresh(patient)
+    return patient

@@ -6,6 +6,10 @@ from email.utils import formataddr, make_msgid
 
 import aiosmtplib
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from dotenv import load_dotenv
+from app.core.config import settings
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +60,9 @@ async def send_email(
 
     host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("SMTP_USER")
-    password = os.getenv("SMTP_PASSWORD")
-    from_name = os.getenv("EMAIL_FROM_NAME", "DRISHTI-AI Screening")
+    user = os.getenv("SMTP_USER") or getattr(settings, "SMTP_USER", None)
+    password = os.getenv("SMTP_PASSWORD") or getattr(settings, "SMTP_PASSWORD", None)
+    from_name = os.getenv("EMAIL_FROM_NAME") or getattr(settings, "EMAIL_FROM_NAME", "DRISHTI-AI Screening")
 
     if not user or not password:
         logger.error("SMTP_USER or SMTP_PASSWORD not set")

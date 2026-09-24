@@ -11,16 +11,12 @@ export function sanitizeFilenameSegment(value) {
 }
 
 /**
- * Renders an offscreen DOM node to a paginated A4 PDF and triggers a
- * browser download. Used for both the patient history report and the
- * single-visit screening report — both render a fixed-width (794px, A4 @
- * 96dpi) React component offscreen, then this captures it as an image and
- * slices it across as many A4 pages as the content needs.
+ * Captures an offscreen or onscreen DOM node and produces a paginated A4 jsPDF instance and PDF Blob.
  * @param {HTMLElement} node
- * @param {string} filename
+ * @returns {Promise<{ pdf: jsPDF, blob: Blob }>}
  */
-export async function exportNodeToPdf(node, filename) {
-  if (!node) throw new Error('exportNodeToPdf: no node to capture')
+export async function nodeToPdfBlob(node) {
+  if (!node) throw new Error('nodeToPdfBlob: no node to capture')
 
   const canvas = await html2canvas(node, {
     scale: 2,
@@ -49,5 +45,34 @@ export async function exportNodeToPdf(node, filename) {
     heightLeft -= pageHeight
   }
 
-  pdf.save(filename)
+  const blob = pdf.output('blob')
+  return { pdf, blob }
 }
+
+/**
+ * Renders an offscreen DOM node to a paginated A4 PDF, triggers a browser download,
+ * and optionally uploads the PDF to the backend if options.screeningId is provided.
+ * @param {HTMLElement} node
+ * @param {string} filename
+ * @param {Object} [options]
+ * @param {number|string} [options.screeningId]
+ * @returns {Promise<{ pdf: jsPDF, blob: Blob }>}
+ */
+export async function exportNodeToPdf(node, filename, options = {}) {
+  const { pdf, blob } = await nodeToPdfBlob(node)
+
+  pdf.save(filename)
+
+  if (options.screeningId) {
+    try {
+      const { uploadScreeningReport } = await import('./api')
+      await uploadScreeningReport(options.screeningId, blob)
+      console.info(`[pdfExport] Uploaded report PDF for screening ${options.screeningId}`)
+    } catch (err) {
+      console.error('[pdfExport] Failed to upload screening report PDF to backend:', err)
+    }
+  }
+
+  return { pdf, blob }
+}
+
