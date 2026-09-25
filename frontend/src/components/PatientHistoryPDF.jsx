@@ -1,4 +1,5 @@
 import { forwardRef } from 'react'
+import { apiAssetUrl } from '../lib/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Eye } from 'lucide-react'
 
@@ -109,7 +110,7 @@ const PatientHistoryPDF = forwardRef(function PatientHistoryPDF(
               <div className="w-full h-full flex items-center justify-center">
                 {latestScreening?.fundus_image_url ? (
                   <img
-                    src={latestScreening.fundus_image_url}
+                    src={apiAssetUrl(latestScreening.fundus_image_url)}
                     alt="Latest Fundus"
                     className="w-full h-full object-cover rounded"
                     crossOrigin="anonymous"
@@ -134,7 +135,7 @@ const PatientHistoryPDF = forwardRef(function PatientHistoryPDF(
               <div className="w-full h-full flex items-center justify-center">
                 {latestScreening?.heatmap_url ? (
                   <img
-                    src={latestScreening.heatmap_url}
+                    src={apiAssetUrl(latestScreening.heatmap_url)}
                     alt="Grad-CAM Salience"
                     className="w-full h-full object-cover rounded"
                     crossOrigin="anonymous"
