@@ -17,7 +17,8 @@ export function apiAssetUrl(path) {
 
 function getAuthHeaders(extra = {}) {
   const token = localStorage.getItem('drishti.token')
-  return token ? { Authorization: `Bearer ${token}`, ...extra } : { ...extra }
+  const base = { 'ngrok-skip-browser-warning': 'true', ...extra }
+  return token ? { Authorization: `Bearer ${token}`, ...base } : base
 }
 
 // ─────────────────────────────────────────────
@@ -185,5 +186,3 @@ export async function healthCheck() {
 export async function localHealthCheck() {
   return get(API_URL, '/health')
 }
-
-
