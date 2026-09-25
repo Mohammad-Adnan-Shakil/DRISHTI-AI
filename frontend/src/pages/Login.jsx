@@ -82,9 +82,7 @@ export default function Login() {
       <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-[0_8px_30px_rgba(40,89,67,0.08)] border border-[#E2E7E3] z-10 my-8">
         {/* Unified Brand Lockup */}
         <div className="flex items-center justify-center mb-5">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
-            <Eye size={18} strokeWidth={2.5} />
-          </div>
+          <img src="/drishti-logo.png" alt="DRISHTI Logo" className="w-8 h-8 object-contain" />
           <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A]">DRISHTI</span>
           <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2">CLINICAL AI</span>
         </div>

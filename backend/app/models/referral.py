@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -11,4 +11,5 @@ class Referral(Base):
     status                = Column(String, default="pending")
     ophthalmologist_grade = Column(Integer, nullable=True)
     doctor_notes          = Column(Text, nullable=True)
+    doctor_name           = Column(String, default="Dr. Arjun Sharma", nullable=True)
     updated_at            = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())

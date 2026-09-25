@@ -43,9 +43,7 @@ export default function AdminNavbar({
           {/* Left: Logo, Wordmark & Tagline */}
           <div className="flex items-center gap-3">
             <Link to="/analytics" className="flex items-center focus:outline-none focus:ring-2 focus:ring-[#16866A] rounded-md p-1">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
-                <Eye size={18} strokeWidth={2.5} />
-              </div>
+              <img src="/drishti-logo.png" alt="DRISHTI Logo" className="w-8 h-8 object-contain" />
               <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A]">DRISHTI</span>
               <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2">CLINICAL AI</span>
             </Link>

@@ -2,11 +2,11 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.database import get_db, AsyncSessionLocal
-from app.api.auth import verify_token, TokenData
+from app.api.auth import verify_token, TokenData, DEMO_USERS
 from app.models.screening import Screening
 from app.models.patient import Patient
 from app.models.referral import Referral
@@ -274,10 +274,23 @@ async def confirm_screening(
     screening.reviewed = True
 
     # Check for linked referral
+    doctor_name = "Dr. Arjun Sharma"
+    if token and token.username:
+        try:
+            u_res = await db.execute(text("SELECT name FROM users WHERE username = :u"), {"u": token.username})
+            u_row = u_res.first()
+            if u_row and u_row[0]:
+                doctor_name = u_row[0]
+            elif token.username in DEMO_USERS:
+                doctor_name = DEMO_USERS[token.username]["name"]
+        except Exception:
+            pass
+
     ref_result = await db.execute(select(Referral).where(Referral.screening_id == screening_id))
     referral = ref_result.scalar_one_or_none()
     if referral:
         referral.status = "attended"
+        referral.doctor_name = doctor_name
         if data:
             if data.ophthalmologist_grade is not None:
                 referral.ophthalmologist_grade = data.ophthalmologist_grade
@@ -290,6 +303,7 @@ async def confirm_screening(
             status="attended",
             ophthalmologist_grade=data.ophthalmologist_grade,
             doctor_notes=data.doctor_notes,
+            doctor_name=doctor_name,
         )
         db.add(referral)
 

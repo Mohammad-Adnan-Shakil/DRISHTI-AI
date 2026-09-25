@@ -30,10 +30,8 @@ const PatientHistoryPDF = forwardRef(function PatientHistoryPDF(
         {/* 1. LETTERHEAD */}
         <div className="flex items-start justify-between border-b-4 border-[#285943] pb-4 mb-6">
           <div className="flex items-center">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
-              <Eye size={18} strokeWidth={2.5} />
-            </div>
-            <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A] font-heading">
+            <img src="/drishti-logo.png" alt="DRISHTI Logo" className="w-8 h-8 object-contain" />
+            <span className="ml-2.5 text-xl font-extrabold tracking-tight text-[#20312A] font-heading">
               DRISHTI
             </span>
             <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-[#047857]/20">

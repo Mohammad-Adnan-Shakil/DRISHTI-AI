@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['drishti-logo.png', 'favicon.svg'],
       manifest: {
         name: 'DRISHTI Clinical AI',
         short_name: 'DRISHTI',
@@ -27,17 +27,12 @@ export default defineConfig(({ mode }) => {
         start_url: '/',
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
+            src: '/drishti-logo.png',
+            sizes: '192x192 512x512',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
+            src: '/drishti-logo.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'

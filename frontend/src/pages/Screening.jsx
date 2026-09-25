@@ -104,7 +104,11 @@ function mapApiPatientToDisplay(patient) {
     phc: patient.phc_id || 'PHC Hosakote',
     diabetesDuration: patient.diabetes_duration_years != null ? `${patient.diabetes_duration_years} Years` : 'Not recorded',
     hba1c: patient.hba1c_level != null ? `${patient.hba1c_level}%` : 'Not recorded',
+    hba1c_level: patient.hba1c_level,
+    diabetes_duration_years: patient.diabetes_duration_years,
     hypertension: patient.hypertension ? 'Yes' : 'No',
+    family_history_dr: patient.family_history_dr,
+    risk_tier: patient.risk_tier,
     language: patient.preferred_language || 'English',
     audioGuidance: true,
     lastScreened: 'No prior screening on file',
@@ -1824,234 +1828,24 @@ export default function Screening() {
 
             {/* Modal Body / A4 Sheet View */}
             <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex justify-center bg-slate-100">
-              <div
-                ref={reportModalRef}
-                style={{ width: '794px', minHeight: '1050px', aspectRatio: '1 / 1.414' }}
-                className="bg-white text-[#20312A] p-8 sm:p-10 rounded-xl shadow-md border border-slate-200 text-xs flex flex-col justify-between print:shadow-none print:border-none print:m-0 print:exact-colors print-color-adjust-exact"
-              >
-                <div>
-                  {/* 1. LETTERHEAD */}
-                  <div className="flex items-start justify-between border-b-4 border-[#285943] pb-4 mb-6">
-                    <div className="flex items-center">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
-                        <Eye size={18} strokeWidth={2.5} />
-                      </div>
-                      <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A] font-heading">
-                        DRISHTI
-                      </span>
-                      <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-[#047857]/20">
-                        CLINICAL AI
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <h2 className="text-base font-extrabold tracking-wide text-[#285943] uppercase font-heading">
-                        CLINICAL ASSESSMENT REPORT
-                      </h2>
-                      <div className="text-xs text-[#66756D] mt-0.5 space-y-0.5">
-                        <div>
-                          Generated: <span className="font-semibold text-[#20312A]">{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                        </div>
-                        <div>
-                          Report ID:{' '}
-                          <span className="font-mono font-semibold text-[#20312A]">
-                            DRISHTI-CR-{selectedPatient?.id ?? '—'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. PATIENT DEMOGRAPHICS BOX */}
-                  <div className="bg-[#F8FAF7] border border-[#E2E7E3] rounded-lg p-4 grid grid-cols-4 gap-4 text-sm mb-6">
-                    <div>
-                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
-                        Patient Name
-                      </span>
-                      <span className="text-[#20312A] font-semibold">
-                        {selectedPatient?.name ?? '—'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
-                        Patient ID / ABHA
-                      </span>
-                      <span className="text-[#20312A] font-semibold font-mono">
-                        {selectedPatient?.id ?? '—'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
-                        Age / Gender
-                      </span>
-                      <span className="text-[#20312A] font-semibold">
-                        {selectedPatient?.ageGender ?? '—'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] uppercase font-bold text-[#66756D]">
-                        Facility / PHC
-                      </span>
-                      <span className="text-[#20312A] font-semibold">
-                        {selectedPatient?.phc ?? '—'}
-                      </span>
-                    </div>
-                    {(selectedPatient?.phone || selectedPatient?.email) && (
-                      <div className="col-span-4 pt-2 border-t border-[#E2E7E3]/60 flex items-center gap-6 text-xs text-[#66756D]">
-                        {selectedPatient?.phone && (
-                          <div>
-                            <span className="font-bold uppercase text-[10px] text-[#66756D] mr-1.5">Phone:</span>
-                            <span className="font-semibold text-[#20312A]">{selectedPatient.phone}</span>
-                          </div>
-                        )}
-                        {selectedPatient?.email && (
-                          <div>
-                            <span className="font-bold uppercase text-[10px] text-[#66756D] mr-1.5">Email:</span>
-                            <span className="font-semibold text-[#20312A]">{selectedPatient.email}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 3. AI FINDINGS & IMAGING (Side-by-Side) */}
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    {/* Left Column: AI-Assisted Screening Result */}
-                    <div className="border border-[#E2E7E3] rounded-lg p-4 bg-white flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] uppercase font-bold text-[#66756D]">
-                            AI-Assisted Screening Result
-                          </span>
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#F8FAF7] border border-[#E2E7E3] text-[#285943]">
-                            {gradeInfo?.risk ?? 'Moderate Risk'}
-                          </span>
-                        </div>
-                        <div
-                          className="text-xl font-bold mb-1"
-                          style={{
-                            color: activeGrade >= 3 ? '#B91C1C' : activeGrade >= 1 ? '#D97706' : '#059669'
-                          }}
-                        >
-                          {gradeInfo?.title ?? `Grade ${activeGrade}`}
-                        </div>
-                        <p className="text-xs text-[#66756D] mb-4">
-                          Examined Eye:{' '}
-                          <span className="font-semibold text-[#20312A]">
-                            {activeEye === 'OD' ? 'Right Eye (OD)' : 'Left Eye (OS)'}
-                          </span>{' '}
-                          &middot; Field:{' '}
-                          <span className="font-semibold text-[#20312A]">45° Non-Mydriatic</span>{' '}
-                          &middot; Quality:{' '}
-                          <span className="font-semibold text-[#20312A]">{qualityScore}%</span>
-                        </p>
-                      </div>
-
-                      <div className="space-y-3 pt-3 border-t border-[#E2E7E3]">
-                        <div>
-                          <div className="flex justify-between items-center text-xs mb-1.5">
-                            <span className="text-[10px] uppercase font-bold text-[#66756D]">
-                              Diagnostic Confidence
-                            </span>
-                            <span className="font-mono font-bold text-[#20312A]">
-                              {activeConfidence}%
-                            </span>
-                          </div>
-                          <div className="w-full h-2.5 bg-[#E2E7E3] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#16866A] rounded-full transition-all"
-                              style={{ width: `${activeConfidence}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="bg-[#F8FAF7] rounded-md p-2.5 border border-[#E2E7E3]">
-                          <span className="text-[10px] uppercase font-bold text-[#285943] block mb-0.5">
-                            Clinical Recommendation
-                          </span>
-                          <p className="text-xs text-[#20312A] leading-relaxed">
-                            {recommendationText ?? gradeInfo?.recommendation}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right Column: IMAGING */}
-                    <div className="border border-[#E2E7E3] rounded-lg p-4 bg-white flex flex-col justify-between">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-[#66756D] block mb-2.5">
-                          Retinal Imaging &amp; Salience Overlay
-                        </span>
-                        <div className="grid grid-cols-2 gap-2">
-                          {/* Fig 1: Standard Fundus */}
-                          <div className="aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative">
-                            {fundusImageUrl ? (
-                              <img
-                                src={apiAssetUrl(fundusImageUrl)}
-                                alt="Standard Fundus"
-                                className="w-full h-full object-cover"
-                                crossOrigin="anonymous"
-                              />
-                            ) : uploadedFile ? (
-                              <img
-                                src={URL.createObjectURL(uploadedFile)}
-                                alt="Standard Fundus"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <svg className="w-24 h-24 select-none" viewBox="0 0 100 100">
-                                <circle cx="50" cy="50" r="42" fill="#9A3412" />
-                                <circle cx="42" cy="46" r="8" fill="#FED7AA" />
-                                <circle cx="62" cy="50" r="10" fill="#431407" opacity="0.8" />
-                                <path d="M42,46 Q45,30 55,22 T75,16" stroke="#7F1D1D" strokeWidth="1.5" fill="none" />
-                                <path d="M42,46 Q47,60 60,70 T80,80" stroke="#7F1D1D" strokeWidth="1.6" fill="none" />
-                              </svg>
-                            )}
-                            <span className="absolute bottom-1 left-1 bg-black/75 text-white text-[9px] px-1.5 py-0.5 rounded font-mono">
-                              {activeEye} · 45°
-                            </span>
-                          </div>
-
-                          {/* Fig 2: Grad-CAM Salience */}
-                          <div className="aspect-square bg-slate-950 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative">
-                            {heatmapUrl ? (
-                              <img
-                                src={apiAssetUrl(heatmapUrl)}
-                                alt="Grad-CAM Salience"
-                                className="w-full h-full object-cover"
-                                crossOrigin="anonymous"
-                              />
-                            ) : (
-                              <svg className="w-24 h-24 select-none" viewBox="0 0 100 100">
-                                <circle cx="50" cy="50" r="42" fill="#9A3412" />
-                                <circle cx="48" cy="48" r="26" fill="#EF4444" opacity="0.8" filter="blur(3px)" />
-                                <circle cx="48" cy="48" r="16" fill="#FBBF24" opacity="0.7" filter="blur(2px)" />
-                              </svg>
-                            )}
-                            <span className="absolute bottom-1 left-1 bg-black/75 text-amber-300 text-[9px] px-1.5 py-0.5 rounded font-mono">
-                              Grad-CAM
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-[#66756D] text-center mt-3 font-medium italic">
-                        Fig 1: Standard Fundus | Fig 2: Grad-CAM Salience
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. DOCTOR SIGNATURE LINE & DISCLAIMER */}
-                <div>
-                  <div className="flex justify-between mt-12 pt-8 border-t border-[#E2E7E3] text-xs text-[#20312A] font-semibold">
-                    <div>Reviewing Physician: ____________________</div>
-                    <div>Signature &amp; Date: ____________________</div>
-                  </div>
-
-                  <div className="text-[9.5px] text-[#66756D] mt-6 pt-3 border-t border-[#E2E7E3] leading-relaxed">
-                    <strong>Medical Disclaimer:</strong> This clinical assessment document is generated by DRISHTI AI Screening Support under National Tele-Ophthalmology Protocols. AI triage recommendations must be confirmed by a licensed ophthalmologist or medical practitioner.
-                  </div>
-                </div>
+              <div className="shadow-md rounded-xl overflow-hidden border border-slate-200">
+                <ScreeningReportPDF
+                  ref={reportModalRef}
+                  patient={selectedPatient}
+                  activeGrade={activeGrade}
+                  activeConfidence={activeConfidence}
+                  activeEye={activeEye}
+                  gradeInfo={gradeInfo}
+                  fundusUrl={fundusImageUrl ? apiAssetUrl(fundusImageUrl) : (uploadedFile ? URL.createObjectURL(uploadedFile) : null)}
+                  gradcamUrl={heatmapUrl ? apiAssetUrl(heatmapUrl) : null}
+                  vesselMapUrl={vesselMapUrl ? apiAssetUrl(vesselMapUrl) : null}
+                  microaneurysmCount={aiResult?.microaneurysm_count}
+                  exudateAreaPercent={aiResult?.exudate_area_percent}
+                  hemorrhageCount={aiResult?.hemorrhage_count}
+                  opticDiscCenter={aiResult?.optic_disc_center}
+                  recommendationText={recommendationText}
+                  qualityScore={qualityScore}
+                />
               </div>
             </div>
           </div>
@@ -2068,7 +1862,12 @@ export default function Screening() {
           activeEye={activeEye}
           gradeInfo={gradeInfo}
           fundusUrl={fundusImageUrl ? apiAssetUrl(fundusImageUrl) : null}
-          gradcamUrl={apiAssetUrl(heatmapUrl)}
+          gradcamUrl={heatmapUrl ? apiAssetUrl(heatmapUrl) : null}
+          vesselMapUrl={vesselMapUrl ? apiAssetUrl(vesselMapUrl) : null}
+          microaneurysmCount={aiResult?.microaneurysm_count}
+          exudateAreaPercent={aiResult?.exudate_area_percent}
+          hemorrhageCount={aiResult?.hemorrhage_count}
+          opticDiscCenter={aiResult?.optic_disc_center}
           recommendationText={recommendationText}
           qualityScore={qualityScore}
         />

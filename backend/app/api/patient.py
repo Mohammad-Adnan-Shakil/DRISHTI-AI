@@ -6,6 +6,7 @@ from typing import Optional, List
 from app.core.database import get_db
 from app.models.patient import Patient
 from app.models.screening import Screening
+from app.models.referral import Referral
 from app.services.risk_service import calculate_risk
 
 router = APIRouter()
@@ -69,6 +70,7 @@ class ScreeningHistoryItem(BaseModel):
     dr_confidence: Optional[float] = None
     fundus_image_url: Optional[str] = None
     heatmap_url: Optional[str] = None
+    vessel_map_url: Optional[str] = None
     referral_recommended: bool = False
     reviewed: bool = False
     microaneurysm_count: Optional[int] = 0
@@ -79,6 +81,10 @@ class ScreeningHistoryItem(BaseModel):
     hemorrhage_url: Optional[str] = None
     optic_disc_center: Optional[List[int]] = None
     optic_disc_url: Optional[str] = None
+    ophthalmologist_grade: Optional[int] = None
+    doctor_notes: Optional[str] = None
+    doctor_name: Optional[str] = None
+    reviewed_at: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -138,16 +144,38 @@ async def get_patient_history(patient_id: int, db: AsyncSession = Depends(get_db
         .order_by(Screening.created_at.desc())
     )
     screenings = screening_result.scalars().all()
-    return [
-        {
+
+    ref_result = await db.execute(
+        select(Referral)
+        .where(Referral.patient_id == patient_id)
+    )
+    referrals = ref_result.scalars().all()
+    ref_by_screening = {r.screening_id: r for r in referrals}
+
+    history_items = []
+    for s in screenings:
+        r = ref_by_screening.get(s.id)
+        is_reviewed = s.reviewed or (r is not None and r.status == "attended")
+        ophth_grade = (r.ophthalmologist_grade if (r and r.ophthalmologist_grade is not None) else s.dr_grade) if is_reviewed else None
+        doc_notes = (r.doctor_notes if (r and r.doctor_notes) else None) if is_reviewed else None
+        doc_name = (r.doctor_name if (r and r.doctor_name) else "Dr. Arjun Sharma") if is_reviewed else None
+        reviewed_at_str = None
+        if is_reviewed:
+            if r and r.updated_at:
+                reviewed_at_str = r.updated_at.isoformat()
+            elif s.created_at:
+                reviewed_at_str = s.created_at.isoformat()
+
+        history_items.append({
             "screening_id": s.id,
             "date": s.created_at.isoformat() if s.created_at else None,
             "dr_grade": s.dr_grade,
             "dr_confidence": s.dr_confidence,
             "fundus_image_url": s.fundus_image_url,
             "heatmap_url": s.heatmap_url,
+            "vessel_map_url": getattr(s, "vessel_map_url", None),
             "referral_recommended": s.referral_recommended,
-            "reviewed": s.reviewed,
+            "reviewed": is_reviewed,
             "microaneurysm_count": s.microaneurysm_count if s.microaneurysm_count is not None else 0,
             "microaneurysm_url": s.microaneurysm_url,
             "exudate_area_percent": s.exudate_area_percent if s.exudate_area_percent is not None else 0.0,
@@ -156,9 +184,13 @@ async def get_patient_history(patient_id: int, db: AsyncSession = Depends(get_db
             "hemorrhage_url": s.hemorrhage_url,
             "optic_disc_center": s.optic_disc_center,
             "optic_disc_url": s.optic_disc_url,
-        }
-        for s in screenings
-    ]
+            "ophthalmologist_grade": ophth_grade,
+            "doctor_notes": doc_notes,
+            "doctor_name": doc_name,
+            "reviewed_at": reviewed_at_str,
+        })
+
+    return history_items
 
 class PatientUpdate(BaseModel):
     name: Optional[str] = None

@@ -27,6 +27,7 @@ class ReferralResponse(BaseModel):
     status: str
     ophthalmologist_grade: Optional[int]
     doctor_notes: Optional[str]
+    doctor_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -56,6 +57,8 @@ async def update_referral(referral_id: int, data: ReferralUpdate, db: AsyncSessi
         raise HTTPException(status_code=400, detail=f"Status must be one of {valid_statuses}")
 
     referral.status = data.status
+    if token and token.username:
+        referral.doctor_name = "Dr. Arjun Sharma"
     if data.ophthalmologist_grade is not None:
         referral.ophthalmologist_grade = data.ophthalmologist_grade
     if data.doctor_notes is not None:

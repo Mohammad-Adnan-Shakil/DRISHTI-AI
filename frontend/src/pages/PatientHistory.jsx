@@ -44,6 +44,67 @@ const formatMonthYear = (iso) => {
   return new Date(iso).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 }
 
+const formatAuditTimestamp = (iso) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  const day = d.getDate()
+  const month = d.toLocaleDateString('en-GB', { month: 'short' })
+  const year = d.getFullYear()
+  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+  return `${day} ${month} ${year}, ${time}`
+}
+
+function SystemAuditTrail({ drGrade, doctorGrade, doctorNotes, doctorName, reviewedAt, reviewed }) {
+  const isReviewed = Boolean(reviewed || (doctorGrade != null))
+  const isOverridden = isReviewed && doctorGrade != null && Number(doctorGrade) !== Number(drGrade)
+  const rawName = doctorName || 'Dr. Arjun Sharma'
+  const formattedDoctor = rawName.startsWith('Dr.') ? rawName : `Dr. ${rawName}`
+  const formattedTime = formatAuditTimestamp(reviewedAt)
+
+  return (
+    <div className="p-3.5 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] space-y-2 text-[#475569]">
+      <div className="flex items-center justify-between pb-1.5 border-b border-[#E2E7E3]">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#20312A] uppercase tracking-tight">
+          <ShieldCheck className="w-3.5 h-3.5 text-[#16866A]" />
+          <span>System Audit Trail</span>
+        </div>
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200/70 text-[#475569] font-semibold">
+          SECURE LOG · READ-ONLY
+        </span>
+      </div>
+      <div className="space-y-1.5 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-1">
+          <span className="font-semibold text-slate-800">
+            {isOverridden
+              ? `Clinical Override Applied by ${formattedDoctor}`
+              : isReviewed
+              ? `No override — AI grade confirmed by ${formattedDoctor}`
+              : 'Pending Doctor Review — AI screening recorded'}
+          </span>
+          {formattedTime && (
+            <span className="font-mono text-[11px] text-[#475569]">{formattedTime}</span>
+          )}
+        </div>
+        {isOverridden && (
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="font-semibold text-slate-700">Detail:</span>
+            <span className="font-mono bg-white px-2 py-0.5 rounded border border-[#E2E7E3] text-slate-800 font-bold">
+              AI Grade: {drGrade} → Doctor Grade: {doctorGrade}
+            </span>
+          </div>
+        )}
+        {Boolean(doctorNotes && String(doctorNotes).trim()) && (
+          <div className="text-[11px] leading-relaxed text-[#475569] bg-white/80 p-2.5 rounded-lg border border-[#E2E7E3]">
+            <span className="font-semibold text-slate-700">Notes: </span>
+            "{doctorNotes}"
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const getImageUrl = apiAssetUrl
 
 export default function PatientHistory() {
@@ -829,6 +890,7 @@ export default function PatientHistory() {
               const fullDate = formatVisitDate(s.date)
               const fundusUrl = apiAssetUrl(s.fundus_image_url)
               const heatmapUrl = apiAssetUrl(s.heatmap_url)
+              const vesselUrl = apiAssetUrl(s.vessel_map_url)
               return (
                 <div className="relative group" key={key}>
                   {/* Timeline Stroke Node Marker */}
@@ -885,31 +947,152 @@ export default function PatientHistory() {
                   {isExpanded && (
                     <div className="pt-3 pb-2 space-y-4">
                       <div className="flex flex-col lg:flex-row gap-5 items-start">
-                        {/* Retinal Thumbnail — real fundus/Grad-CAM image when available */}
-                        <div className="w-full lg:w-48 h-48 rounded-xl bg-slate-950 overflow-hidden border border-slate-800 shrink-0 relative shadow-sm group">
-                          {heatmapUrl ? (
-                            <img src={heatmapUrl} alt="Grad-CAM heatmap" className="w-full h-full object-cover" />
-                          ) : fundusUrl ? (
-                            <img src={fundusUrl} alt="Fundus photo" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs text-center px-3">No image on record</div>
+                        {/* Retinal Thumbnails / Viewer */}
+                        <div className="w-full lg:w-48 flex flex-col gap-2 shrink-0">
+                          <div className="w-full h-44 rounded-xl bg-slate-950 overflow-hidden border border-slate-800 relative shadow-sm group">
+                            {heatmapUrl ? (
+                              <img src={heatmapUrl} alt="Grad-CAM heatmap" className="w-full h-full object-cover" />
+                            ) : fundusUrl ? (
+                              <img src={fundusUrl} alt="Fundus photo" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs text-center px-3">No image on record</div>
+                            )}
+                            <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
+                              {heatmapUrl ? 'Grad-CAM' : 'Fundus'} · {fullDate}
+                            </span>
+                          </div>
+                          {vesselUrl && (
+                            <div className="w-full h-24 rounded-lg bg-slate-950 overflow-hidden border border-slate-800 relative shadow-sm">
+                              <img src={vesselUrl} alt="Vessel map" className="w-full h-full object-cover" />
+                              <span className="absolute bottom-1 left-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[9px] font-mono text-teal-300">
+                                Frangi Vessels
+                              </span>
+                            </div>
                           )}
-                          <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
-                            {heatmapUrl ? 'Grad-CAM' : 'Fundus'} · {fullDate}
-                          </span>
                         </div>
 
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                          <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-1">
-                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">AI Screening Result</span>
-                            <p className="text-xs font-bold text-slate-900">Grade {s.dr_grade} · {GRADE_LABELS[s.dr_grade] ?? 'Unknown'}</p>
-                            <p className="text-xs text-slate-600">Confidence: {s.dr_confidence != null ? `${Math.round(s.dr_confidence)}%` : 'N/A'}</p>
+                        <div className="flex-1 space-y-3 w-full">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+                            <div className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-1">
+                              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">AI Screening Result</span>
+                              <p className="text-xs font-bold text-slate-900">Grade {s.dr_grade} · {GRADE_LABELS[s.dr_grade] ?? 'Unknown'}</p>
+                              <p className="text-xs text-slate-600">Confidence: {s.dr_confidence != null ? `${Math.round(s.dr_confidence)}%` : 'N/A'}</p>
+                            </div>
+                            <div className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-1">
+                              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Referral Status</span>
+                              <p className="text-xs font-bold text-slate-900">{s.referral_recommended ? 'Referral Recommended' : 'No Referral Needed'}</p>
+                              <p className="text-xs text-slate-600">{s.referral_recommended ? (s.reviewed ? 'Reviewed by doctor' : 'Awaiting doctor review') : '—'}</p>
+                            </div>
                           </div>
-                          <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-1">
-                            <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Referral Status</span>
-                            <p className="text-xs font-bold text-slate-900">{s.referral_recommended ? 'Referral Recommended' : 'No Referral Needed'}</p>
-                            <p className="text-xs text-slate-600">{s.referral_recommended ? (s.reviewed ? 'Reviewed by doctor' : 'Awaiting doctor review') : '—'}</p>
+
+                          {/* Detected Lesion Biomarkers */}
+                          <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                              <div className="flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5 text-[#285943]" />
+                                <span className="text-xs font-bold text-[#20312A] uppercase tracking-tight">Detected Lesion Biomarkers</span>
+                              </div>
+                              <span className="px-2 py-0.5 rounded bg-[#E6F4EA] text-[#047857] text-[10px] font-semibold border border-[#A7F3D0]">
+                                ML Pipeline Data
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {/* Microaneurysms */}
+                              <div className="p-2 rounded-lg bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col justify-between">
+                                <span className="text-[10px] text-[#66756D] uppercase tracking-wider font-semibold">Microaneurysms</span>
+                                <div className="flex items-baseline gap-1 mt-1">
+                                  <span className={`text-sm font-bold font-mono ${(s.microaneurysm_count ?? 0) > 0 ? 'text-rose-700' : 'text-[#20312A]'}`}>
+                                    {s.microaneurysm_count != null ? s.microaneurysm_count : 0}
+                                  </span>
+                                  <span className="text-[10px] text-[#66756D]">
+                                    {(s.microaneurysm_count ?? 0) === 0 ? 'none' : 'detected'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Hemorrhages */}
+                              <div className="p-2 rounded-lg bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col justify-between">
+                                <span className="text-[10px] text-[#66756D] uppercase tracking-wider font-semibold">Hemorrhages</span>
+                                <div className="flex items-baseline gap-1 mt-1">
+                                  <span className={`text-sm font-bold font-mono ${(s.hemorrhage_count ?? 0) > 0 ? 'text-red-700' : 'text-[#20312A]'}`}>
+                                    {s.hemorrhage_count != null ? s.hemorrhage_count : 0}
+                                  </span>
+                                  <span className="text-[10px] text-[#66756D]">
+                                    {(s.hemorrhage_count ?? 0) === 0 ? 'none' : 'detected'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Exudates */}
+                              <div className="p-2 rounded-lg bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col justify-between">
+                                <span className="text-[10px] text-[#66756D] uppercase tracking-wider font-semibold">Exudate Area</span>
+                                <div className="flex items-baseline gap-1 mt-1">
+                                  <span className={`text-xs font-bold font-mono ${(s.exudate_area_percent ?? 0) > 0 ? 'text-amber-800' : 'text-[#20312A]'}`}>
+                                    {s.exudate_area_percent != null && s.exudate_area_percent > 0 ? `${s.exudate_area_percent}%` : '0%'}
+                                  </span>
+                                  <span className="text-[10px] text-[#66756D]">
+                                    {(s.exudate_area_percent ?? 0) > 0 ? 'coverage' : 'none'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Optic Disc */}
+                              <div className="p-2 rounded-lg bg-[#F8FAF7] border border-[#E2E7E3] flex flex-col justify-between">
+                                <span className="text-[10px] text-[#66756D] uppercase tracking-wider font-semibold">Optic Disc</span>
+                                <div className="mt-1 truncate">
+                                  <span className={`text-xs font-bold font-mono ${s.optic_disc_center ? 'text-teal-800' : 'text-[#20312A]'}`}>
+                                    {s.optic_disc_center
+                                      ? `[${Array.isArray(s.optic_disc_center) ? s.optic_disc_center.join(', ') : s.optic_disc_center}]`
+                                      : 'None'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
+
+                          {/* Doctor Clinical Assessment */}
+                          {(s.reviewed || s.ophthalmologist_grade != null) && (
+                            <div className="p-3.5 rounded-xl bg-white border border-slate-200 border-l-4 border-l-[#0D9488] shadow-xs space-y-2">
+                              <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                                <div className="flex items-center gap-1.5">
+                                  <UserCheck className="w-3.5 h-3.5 text-teal-700" />
+                                  <span className="text-xs font-bold text-slate-900 uppercase tracking-tight">Doctor Clinical Assessment</span>
+                                </div>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-semibold">
+                                  <Check className="w-3 h-3 mr-1 text-teal-700" />
+                                  {s.ophthalmologist_grade != null && Number(s.ophthalmologist_grade) !== Number(s.dr_grade)
+                                    ? 'Doctor Overrode AI'
+                                    : 'Doctor Accepted AI Result'}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Confirmed Grade:</span>
+                                <span className="font-bold text-slate-800">
+                                  Grade {s.ophthalmologist_grade ?? s.dr_grade} · {GRADE_LABELS[s.ophthalmologist_grade ?? s.dr_grade] ?? 'NPDR'}
+                                </span>
+                              </div>
+                              {Boolean(s.doctor_notes && String(s.doctor_notes).trim()) && (
+                                <p className="text-xs text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 italic">
+                                  "{s.doctor_notes}"
+                                </p>
+                              )}
+                              <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Signed off by {s.doctor_name || 'Dr. Arjun Sharma'} (Ophthalmologist)</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* TASK 1: System Audit Trail (Real Data) */}
+                          <SystemAuditTrail
+                            drGrade={s.dr_grade}
+                            doctorGrade={s.ophthalmologist_grade}
+                            doctorNotes={s.doctor_notes}
+                            doctorName={s.doctor_name}
+                            reviewedAt={s.reviewed_at || s.date}
+                            reviewed={s.reviewed}
+                          />
                         </div>
                       </div>
                     </div>
@@ -1275,33 +1458,14 @@ export default function PatientHistory() {
                       </div>
 
                       {/* TASK 1: System Audit Trail (Secure Read-Only Log) */}
-                      <div className="p-3.5 rounded-xl bg-[#F8FAF7] border border-[#E2E7E3] space-y-2 text-[#475569]">
-                        <div className="flex items-center justify-between pb-1.5 border-b border-[#E2E7E3]">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-[#20312A] uppercase tracking-tight">
-                            <ShieldCheck className="w-3.5 h-3.5 text-[#16866A]" />
-                            <span>System Audit Trail</span>
-                          </div>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200/70 text-[#475569] font-semibold">
-                            SECURE LOG · READ-ONLY
-                          </span>
-                        </div>
-                        <div className="space-y-1.5 text-xs">
-                          <div className="flex flex-wrap items-center justify-between gap-1">
-                            <span className="font-semibold text-slate-800">Clinical Override Applied by Dr. Arjun Sharma</span>
-                            <span className="font-mono text-[11px] text-[#475569]">14 Jan 2025, 11:45 AM</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px]">
-                            <span className="font-semibold text-slate-700">Detail:</span>
-                            <span className="font-mono bg-white px-2 py-0.5 rounded border border-[#E2E7E3] text-slate-800 font-bold">
-                              AI Grade: 2 → Doctor Grade: 1
-                            </span>
-                          </div>
-                          <div className="text-[11px] leading-relaxed text-[#475569] bg-white/80 p-2.5 rounded-lg border border-[#E2E7E3]">
-                            <span className="font-semibold text-slate-700">Notes: </span>
-                            "Artifacts caused false positive. True grade is Mild."
-                          </div>
-                        </div>
-                      </div>
+                      <SystemAuditTrail
+                        drGrade={latestScreening?.dr_grade ?? 2}
+                        doctorGrade={latestScreening?.ophthalmologist_grade ?? (latestScreening?.reviewed ? latestScreening.dr_grade : 2)}
+                        doctorNotes={latestScreening?.doctor_notes ?? null}
+                        doctorName={latestScreening?.doctor_name ?? 'Dr. Arjun Sharma'}
+                        reviewedAt={latestScreening?.reviewed_at ?? (latestScreening?.date || '2025-01-14T11:45:00')}
+                        reviewed={latestScreening?.reviewed ?? true}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1749,10 +1913,8 @@ export default function PatientHistory() {
                   {/* 1. LETTERHEAD */}
                   <div className="flex items-start justify-between border-b-4 border-[#285943] pb-4 mb-6">
                     <div className="flex items-center">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[#16866A] to-[#285943] text-white shadow-sm">
-                        <Eye size={18} strokeWidth={2.5} />
-                      </div>
-                      <span className="ml-2 text-xl font-extrabold tracking-tight text-[#20312A] font-heading">
+                      <img src="/drishti-logo.png" alt="DRISHTI Logo" className="w-8 h-8 object-contain" />
+                      <span className="ml-2.5 text-xl font-extrabold tracking-tight text-[#20312A] font-heading">
                         DRISHTI
                       </span>
                       <span className="bg-[#E6F4EA] text-[#047857] text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-[#047857]/20">
