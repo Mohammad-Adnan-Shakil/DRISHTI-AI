@@ -226,7 +226,11 @@ export default function PatientHistory() {
         date: formatVisitDate(s.date),
         eye: 'OD',
         grade: s.dr_grade,
-        doctorAssessment: s.reviewed ? `Doctor Reviewed (Gr.${s.dr_grade})` : `AI Screened (Gr.${s.dr_grade})`,
+        doctorAssessment: !s.reviewed
+          ? `AI Screened (Gr.${s.dr_grade})`
+          : (s.ophthalmologist_grade != null && s.ophthalmologist_grade !== s.dr_grade)
+          ? `Doctor Overruled (Gr.${s.ophthalmologist_grade})`
+          : `Doctor Accepted AI (Gr.${s.ophthalmologist_grade ?? s.dr_grade})`,
         carePlan: s.referral_recommended ? 'Referral Recommended' : 'Routine monitoring'
       }))
     : [

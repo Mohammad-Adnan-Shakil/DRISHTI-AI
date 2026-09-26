@@ -15,7 +15,7 @@
 
 > **🏥 Cleared Smart India Hackathon 2026 — College Internal Round**
 > PPT submission deadline: Sep 30, 2026 · Targeting Grand Finale selection
-> Frontend live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app) · Backend deployment in progress
+> Frontend live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app) · Android APK available
 
 ---
 
@@ -34,13 +34,15 @@ tool that works offline, explains its decisions, and routes patients to care aut
 
 | Step | What Happens |
 |------|-------------|
-| 1 | Health worker uploads fundus image via mobile PWA |
+| 1 | Health worker uploads fundus image via mobile PWA (installable as Android APK) |
 | 2 | MATLAB checks image quality + applies CLAHE enhancement |
 | 3 | EfficientNet-B4 classifies DR severity (Grade 0-4) + flags DME |
-| 4 | Risk stratification engine scores patient using clinical history |
-| 5 | Grad-CAM generates heatmap showing WHERE retinal damage is |
-| 6 | Groq LLM generates referral recommendation in patient preferred language |
-| 7 | Patient record saved, doctor notified, referral tracked |
+| 4 | Lesion-level detection: microaneurysm count, hemorrhage count, exudate area %, optic disc localization |
+| 5 | Grad-CAM generates heatmap + Frangi vessel map showing WHERE retinal damage is |
+| 6 | Risk stratification engine scores patient using clinical history (HbA1c, diabetes duration, hypertension, family history) |
+| 7 | Doctor reviews AI grade, can apply a clinical override — logged in a read-only System Audit Trail |
+| 8 | Patient automatically receives a screening result email (with a downloadable clinical PDF report) once consented and the doctor confirms |
+| 9 | Referral routed and tracked; full longitudinal patient history with DR grade progression over time |
 
 ---
 
@@ -53,6 +55,16 @@ tool that works offline, explains its decisions, and routes patients to care aut
 | 2 | Moderate DR | Refer within 3 months |
 | 3 | Severe DR | Refer within 2 weeks |
 | 4 | Proliferative DR | Urgent referral within 48 hours |
+
+---
+
+## Explainability
+
+DRISHTI doesn't just output a grade — it shows its work:
+- **Grad-CAM saliency maps** — visual heatmap of what the model attended to
+- **Frangi vessel segmentation** — retinal vasculature map
+- **Lesion-level biomarkers** — microaneurysm count, hemorrhage count, exudate area %, optic disc coordinates, surfaced on the doctor dashboard, patient history, and clinical PDF report
+- **System Audit Trail** — every doctor override of the AI grade is logged with a timestamp, the doctor's name, the AI-vs-doctor grade delta, and clinical notes
 
 ---
 
@@ -69,20 +81,24 @@ tool that works offline, explains its decisions, and routes patients to care aut
 - **FastAPI** (Python) — REST API
 - **JWT Authentication** — python-jose + passlib, role-based access (health_worker, doctor, admin), 24-hour token expiry
 - **NeonDB** (PostgreSQL serverless) — patient records, screenings, referrals
+- **Automated patient email notifications** — Gmail SMTP, HTML report email with inline branding, DPDP-consent-gated, idempotent, sent as a background task on doctor confirmation
+- **Clinical PDF report generation** — client-rendered, server-attached, includes lesion summary, risk factor breakdown, and multimodal imaging (fundus / Grad-CAM / vessel map)
 - **Groq LLM** — multilingual referral recommendations (Kannada, Hindi, Tamil, Telugu, Marathi, English)
 - **Risk stratification engine** — scores Grade 0/1 patients using HbA1c, diabetes duration, hypertension, family history
+- **Rate limiting** — 5/min login, 10/min classify
 
 ### Frontend
 - **React + Tailwind CSS** — doctor dashboard + health worker interface
-- **PWA + Service Worker + IndexedDB** — offline-first, auto-sync when connection restored
-- **Capacitor** — Android APK build
+- **6-language localization** — English, Kannada, Hindi, Telugu, Tamil, Marathi (core screening workflow)
+- **PWA + Service Worker** — offline-capable app shell, verified working with no network connection
+- **Capacitor** — Android APK build, tested end-to-end on-device
 - **Role-based protected routes** — health_worker, doctor, admin access control
 
 ### Deployment
-- Backend → deployment in progress
 - Frontend → Vercel ✅ Live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app)
+- Backend → FastAPI, tunneled via ngrok for live demo access
 - Model weights → HuggingFace Hub (`adnshkl/drishti-efficientnet-b4-dr`)
-- Android APK → built (DRISHTI-AI.apk, 4.7MB)
+- Android APK → built and verified on-device (Capacitor)
 
 ---
 
@@ -94,13 +110,14 @@ DRISHTI-AI/
 │ │ ├── api/ # Route handlers + JWT auth
 │ │ ├── core/ # Config, DB connection
 │ │ ├── models/ # SQLAlchemy models
-│ │ └── services/ # ML, MATLAB, LLM, risk engine
+│ │ └── services/ # ML, MATLAB, LLM, risk engine, email
 │ └── main.py
 ├── ml/
 │ ├── matlab/ # MATLAB scripts (CLAHE, quality, segmentation)
 │ ├── simulink/ # Simulink pipeline model + Stateflow referral FSM
 │ └── models/ # Trained model weights
 ├── frontend/ # React PWA (doctor dashboard + health worker UI)
+│ ├── src/locales/ # 6-language translation files
 │ └── android/ # Capacitor Android project
 └── docs/ # Architecture diagrams, API spec
 
@@ -133,8 +150,8 @@ DRISHTI-AI/
 
 | Role | Scope |
 |------|-------|
-| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, JWT auth, risk engine, PWA offline logic |
-| Frontend | React PWA, doctor dashboard, health worker UI, role-based routing |
+| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, JWT auth, risk engine, email notifications, PWA offline logic |
+| Frontend | React PWA, doctor dashboard, health worker UI, role-based routing, 6-language localization |
 
 ---
 
