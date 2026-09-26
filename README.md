@@ -75,7 +75,7 @@ DRISHTI doesn't just output a grade — it shows its work:
 - **MATLAB Image Processing Toolbox** — CLAHE preprocessing, quality assessment, vessel segmentation
 - **Simulink + Stateflow** — DR screening pipeline model, referral workflow state machine
 - **Grad-CAM** — explainability heatmaps showing lesion regions
-- **Training Data** — APTOS 2019 (3,662) + IDRiD (455, pixel-level DME masks) — 4,117 images | Validated against Messidor-2 (1,748)
+- **Training Data** — APTOS 2019 + IDRiD, 3,751 images total | Internal validation split: 563 images | External validation on IDRiD (held out from training) in progress
 
 ### Backend
 - **FastAPI** (Python) — REST API
@@ -126,13 +126,15 @@ DRISHTI-AI/
 
 ## Model Performance
 
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| Sensitivity (Grade 2+) | 91-94% | **92.8%** |
-| Specificity | > 85% | **93.6%** |
+| Metric | Target | Internal Validation (n=563) |
+|--------|--------|-----------|
+| Sensitivity (Referable DR, Grade 2+) | >90% | **92.8%** |
+| Specificity | >85% | **93.6%** |
 | Processing time | < 5 seconds/image | **~2 seconds** |
 | Report generation | < 30 seconds | — |
 | Languages supported | 6 | **6** |
+
+*Internal validation is a held-out split from the same training data pool (APTOS + IDRiD combined), not an independent external test set. External validation on fully held-out IDRiD data is in progress — see [ml/README.md] for methodology once available.*
 
 ---
 
