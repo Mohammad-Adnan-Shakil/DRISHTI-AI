@@ -76,7 +76,11 @@ DRISHTI doesn't just output a grade — it shows its work:
 - **MATLAB Image Processing Toolbox** — CLAHE preprocessing, quality assessment, vessel segmentation
 - **Simulink (SimEvents)** — discrete-event simulation of the PHC screening pipeline: patient arrival, AI processing queue, doctor review queue, and capacity/backlog modeling
 - **Grad-CAM** — explainability heatmaps showing lesion regions
+<<<<<<< HEAD
 - **Training Data** — APTOS 2019 + IDRiD, 3,751 images combined pool | Model retrained on APTOS-only (3,296 images) with IDRiD (455 images) fully held out as an independent external test set
+=======
+- **Training Data** — APTOS 2019 + IDRiD, 3,751 images total | Internal validation split: 563 images | External validation on IDRiD (held out from training) in progress
+>>>>>>> 0a8663eae22ccd44e5c11e891bfec8ce0b739dc9
 
 ### Backend
 - **FastAPI** (Python) — REST API
@@ -127,6 +131,7 @@ DRISHTI-AI/
 
 ## Model Performance
 
+<<<<<<< HEAD
 | Metric | Target | Internal Validation (n=563) | External Validation — IDRiD, held out (n=455) |
 |--------|--------|-----------|-----------|
 | Sensitivity (Referable DR, Grade 2+) | >90% | 92.8% | **80.9%** (95% CI: 76.1–84.9%) |
@@ -137,6 +142,17 @@ DRISHTI-AI/
 | Languages supported | 6 | **6** | — |
 
 *Internal validation is a held-out split from the training data pool. External validation retrains the model on APTOS only and tests exclusively on IDRiD (455 images never seen during training) — a true generalization check. The drop in sensitivity from internal to external validation reflects the known domain-shift challenge in DR screening AI (different camera, population, and label distribution between datasets), and is an area of active work rather than a hidden limitation.*
+=======
+| Metric | Target | Internal Validation (n=563) |
+|--------|--------|-----------|
+| Sensitivity (Referable DR, Grade 2+) | >90% | **92.8%** |
+| Specificity | >85% | **93.6%** |
+| Processing time | < 5 seconds/image | **~2 seconds** |
+| Report generation | < 30 seconds | — |
+| Languages supported | 6 | **6** |
+>>>>>>> 0a8663eae22ccd44e5c11e891bfec8ce0b739dc9
+
+*Internal validation is a held-out split from the same training data pool (APTOS + IDRiD combined), not an independent external test set. External validation on fully held-out IDRiD data is in progress — see [ml/README.md] for methodology once available.*
 
 ---
 
