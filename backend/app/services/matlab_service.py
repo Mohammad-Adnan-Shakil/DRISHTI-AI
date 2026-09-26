@@ -32,7 +32,7 @@ def denoise(img: np.ndarray) -> np.ndarray:
 
 
 def apply_clahe(img: np.ndarray) -> np.ndarray:
-    """CLAHE in LAB colorspace — same algorithm as MATLAB CLAHE."""
+    """CLAHE in LAB colorspace — Python reimplementation of MATLAB's adapthisteq algorithm."""
     r, g, b = img[:,:,0], img[:,:,1], img[:,:,2]
     l = (0.299 * r + 0.587 * g + 0.114 * b).astype(np.uint8)
     tile_h = max(1, l.shape[0] // 8)
@@ -78,7 +78,41 @@ def run_quality_check(image_path: str) -> dict:
     contrast_score   = 33 if contrast >= 25 else 0
     sharpness_score  = 34 if sharpness >= 20 else 0
     quality_score    = brightness_score + contrast_score + sharpness_score
-    passed           = quality_score >= 60
+
+    # --- Localized glare / occlusion check (8x8 tile grid) ---
+    # A global average can hide a small overexposed or blacked-out patch
+    # covering part of the retina — this catches it independently of the
+    # whole-image brightness/contrast/sharpness scores above.
+    GLARE_THRESHOLD = 200
+    DARK_THRESHOLD  = 15
+    tile_rows, tile_cols = 8, 8
+    h, w = gray.shape
+    row_step = max(1, h // tile_rows)
+    col_step = max(1, w // tile_cols)
+
+    glare_tiles = 0
+    dark_tiles  = 0
+    total_tiles = 0
+
+    for i in range(tile_rows):
+        for j in range(tile_cols):
+            y0, y1 = i * row_step, min((i + 1) * row_step, h)
+            x0, x1 = j * col_step, min((j + 1) * col_step, w)
+            tile = gray[y0:y1, x0:x1]
+            if tile.size == 0:
+                continue
+            tile_mean = float(np.mean(tile))
+            total_tiles += 1
+            if tile_mean > GLARE_THRESHOLD:
+                glare_tiles += 1
+            if tile_mean < DARK_THRESHOLD:
+                dark_tiles += 1
+
+    glare_fraction = glare_tiles / total_tiles if total_tiles else 0
+    dark_fraction  = dark_tiles / total_tiles if total_tiles else 0
+    localized_defect = (glare_fraction > 0.03) or (dark_fraction > 0.10)
+
+    passed = (quality_score >= 60) and not localized_defect
 
     img_uint8 = np.array(pil_img, dtype=np.uint8)
 
@@ -100,6 +134,9 @@ def run_quality_check(image_path: str) -> dict:
         "brightness": round(brightness, 2),
         "contrast": round(contrast, 2),
         "sharpness": round(sharpness, 2),
+        "glare_fraction": round(glare_fraction, 3),
+        "dark_fraction": round(dark_fraction, 3),
+        "localized_defect": localized_defect,
         "passed": passed,
         "enhanced_image_path": f"/static/temp/{output_filename}"
     }
