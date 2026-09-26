@@ -43,6 +43,7 @@ tool that works offline, explains its decisions, and routes patients to care aut
 | 7 | Doctor reviews AI grade, can apply a clinical override — logged in a read-only System Audit Trail |
 | 8 | Patient automatically receives a screening result email (with a downloadable clinical PDF report) once consented and the doctor confirms |
 | 9 | Referral routed and tracked; full longitudinal patient history with DR grade progression over time |
+| 10 | Simulink-modeled telemedicine capacity pipeline simulates patient arrival, AI processing, and doctor review queues for district-scale deployment planning |
 
 ---
 
@@ -73,9 +74,9 @@ DRISHTI doesn't just output a grade — it shows its work:
 ### ML & Signal Processing
 - **EfficientNet-B4** (PyTorch + timm) — DR grading (Grade 0-4) + DME detection (multi-task)
 - **MATLAB Image Processing Toolbox** — CLAHE preprocessing, quality assessment, vessel segmentation
-- **Simulink + Stateflow** — DR screening pipeline model, referral workflow state machine
+- **Simulink (SimEvents)** — discrete-event simulation of the PHC screening pipeline: patient arrival, AI processing queue, doctor review queue, and capacity/backlog modeling
 - **Grad-CAM** — explainability heatmaps showing lesion regions
-- **Training Data** — APTOS 2019 (3,662) + IDRiD (455, pixel-level DME masks) — 4,117 images | Validated against Messidor-2 (1,748)
+- **Training Data** — APTOS 2019 + IDRiD, 3,751 images combined pool | Model retrained on APTOS-only (3,296 images) with IDRiD (455 images) fully held out as an independent external test set
 
 ### Backend
 - **FastAPI** (Python) — REST API
@@ -114,7 +115,7 @@ DRISHTI-AI/
 │ └── main.py
 ├── ml/
 │ ├── matlab/ # MATLAB scripts (CLAHE, quality, segmentation)
-│ ├── simulink/ # Simulink pipeline model + Stateflow referral FSM
+│ ├── simulink/ # drishti_telemedicine_capacity.slx — PHC screening pipeline capacity model
 │ └── models/ # Trained model weights
 ├── frontend/ # React PWA (doctor dashboard + health worker UI)
 │ ├── src/locales/ # 6-language translation files
@@ -126,13 +127,16 @@ DRISHTI-AI/
 
 ## Model Performance
 
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| Sensitivity (Grade 2+) | 91-94% | **92.8%** |
-| Specificity | > 85% | **93.6%** |
-| Processing time | < 5 seconds/image | **~2 seconds** |
-| Report generation | < 30 seconds | — |
-| Languages supported | 6 | **6** |
+| Metric | Target | Internal Validation (n=563) | External Validation — IDRiD, held out (n=455) |
+|--------|--------|-----------|-----------|
+| Sensitivity (Referable DR, Grade 2+) | >90% | 92.8% | **80.9%** (95% CI: 76.1–84.9%) |
+| Specificity | >85% | 93.6% | **99.3%** (95% CI: 96.3–99.9%) |
+| 5-class accuracy | — | — | 51.0% |
+| Processing time | < 5 seconds/image | **~2 seconds** | — |
+| Report generation | < 30 seconds | — | — |
+| Languages supported | 6 | **6** | — |
+
+*Internal validation is a held-out split from the training data pool. External validation retrains the model on APTOS only and tests exclusively on IDRiD (455 images never seen during training) — a true generalization check. The drop in sensitivity from internal to external validation reflects the known domain-shift challenge in DR screening AI (different camera, population, and label distribution between datasets), and is an area of active work rather than a hidden limitation.*
 
 ---
 
@@ -150,7 +154,7 @@ DRISHTI-AI/
 
 | Role | Scope |
 |------|-------|
-| ML + Backend | EfficientNet, Grad-CAM, MATLAB, FastAPI, NeonDB, Groq, JWT auth, risk engine, email notifications, PWA offline logic |
+| ML + Backend | EfficientNet, Grad-CAM, MATLAB, Simulink, FastAPI, NeonDB, Groq, JWT auth, risk engine, email notifications, PWA offline logic |
 | Frontend | React PWA, doctor dashboard, health worker UI, role-based routing, 6-language localization |
 
 ---
