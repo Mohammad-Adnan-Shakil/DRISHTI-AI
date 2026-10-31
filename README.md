@@ -1,4 +1,4 @@
-<div align="center">
+div align="center">
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=1a0000,8B0000,DC143C&height=200&section=header&text=DRISHTI-AI&fontSize=52&fontColor=ffffff&fontAlignY=38&desc=Explainable%20AI%20for%20Diabetic%20Retinopathy%20Screening%20in%20Rural%20India&descAlignY=60&descSize=16&animation=fadeIn"/>
 
@@ -14,7 +14,6 @@
 </div>
 
 > **🏥 Cleared Smart India Hackathon 2026 — College Internal Round**
-> PPT submission deadline: Sep 30, 2026 · Targeting Grand Finale selection
 > Frontend live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app) · Android APK available
 
 ---
@@ -97,7 +96,7 @@ DRISHTI doesn't just output a grade — it shows its work:
 
 ### Deployment
 - Frontend → Vercel ✅ Live at [drishti-ai-ruddy.vercel.app](https://drishti-ai-ruddy.vercel.app)
-- Backend → FastAPI, tunneled via ngrok for live demo access
+- Backend → FastAPI on local server, exposed for demo via tunnel
 - Model weights → HuggingFace Hub (`adnshkl/drishti-efficientnet-b4-dr`)
 - Android APK → built and verified on-device (Capacitor)
 
@@ -115,7 +114,7 @@ DRISHTI-AI/
 │ └── main.py
 ├── ml/
 │ ├── matlab/ # MATLAB scripts (CLAHE, quality, segmentation)
-│ ├── simulink/ # drishti_telemedicine_capacity.slx — PHC screening pipeline capacity model
+│ ├── simulink/ # drishti_telemedicine_capacity.slx
 │ └── models/ # Trained model weights
 ├── frontend/ # React PWA (doctor dashboard + health worker UI)
 │ ├── src/locales/ # 6-language translation files
@@ -144,18 +143,15 @@ DRISHTI-AI/
 
 | Recognition | Details |
 |---|---|
-| 🏥 SIH 2026 | Cleared college internal round — SIH26038 · MathWorks · PPT submission Sep 30 |
+| 🏥 SIH 2026 | Cleared college internal round — SIH26038 · MathWorks |
 
 ---
 
-## Team
+## Built By
 
-**Presidency University, Bengaluru — Batch 2024-2028**
+**Mohammad Adnan Shakil** — ML, backend, MATLAB/Simulink, FastAPI, NeonDB, Groq integration, JWT auth, risk engine, email notifications, PWA offline logic
 
-| Role | Scope |
-|------|-------|
-| ML + Backend | EfficientNet, Grad-CAM, MATLAB, Simulink, FastAPI, NeonDB, Groq, JWT auth, risk engine, email notifications, PWA offline logic |
-| Frontend | React PWA, doctor dashboard, health worker UI, role-based routing, 6-language localization |
+Presidency University, Bengaluru · Batch 2024-2028
 
 ---
 
